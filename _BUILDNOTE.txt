@@ -1,0 +1,2 @@
+Created with pyscaffold via:
+putup -p jeppson -d "Pipe network flow analysis toolkit" -l mit jeppson-python
