@@ -51,17 +51,11 @@ class Pipe(object):
             self._odiameter = self.idiameter + 2.0 * twall
         elif schedule:
             self.nearest_dimensions_from_schedule(schedule)
-##            try:
-#            (NPS, Di, Do, t) = fv.nearest_pipe(Di=self.idiameter,
-#                                               schedule=schedule)
-#            self._twall = t
-#            self._odiameter = Do
-#            self.idiameter = Di
-#TODO Log that pipe ID has been adjusted beyond 1% of original ID
+# TODO Log that pipe ID has been adjusted beyond 1% of original ID
 #                if abs(Di - self.idiameter) / self.idiameter > 0.01:
 #                    log("")
 #            except ValueError as err:
-#TODO Handle nearest_pipe ValueError
+# TODO Handle nearest_pipe ValueError
 
     @property
     def idiameter(self):
@@ -117,7 +111,7 @@ class Pipe(object):
     @flow_area.setter
     def flow_area(self, flow_area):
         """ Pipe flow area - write """
-        raise ValueError('Cannot directly set flow area; ' \
+        raise ValueError('Cannot directly set flow area; '
                          'value is derived from inner diameter')
 
     def nearest_material_roughness(self, surface, clean):
@@ -126,21 +120,21 @@ class Pipe(object):
         surface_key = fv.nearest_material_roughness(surface, clean)
         if surface_key:
             eroughness = fv.material_roughness(surface_key)
-            if clean:
-                clean_tag = 'clean'
-            else:
-                clean_tag = 'fouled'
-#TODO Log msg so assumption is clear
-            msg = "Note: Surface roughness set to {0:0.4E}; used '{1:s}' " \
-                  "based on specification '{2:s}, {3:s}'".format(
-                  eroughness, surface_key, surface, clean_tag)
+#            if clean:
+#                clean_tag = 'clean'
+#            else:
+#                clean_tag = 'fouled'
+# TODO Log msg so assumption is clear
+#            msg = "Note: Surface roughness set to {0:0.4E}; used '{1:s}' " \
+#                  "based on specification '{2:s}, {3:s}'".format(
+#                  eroughness, surface_key, surface, clean_tag)
             self.eroughness = eroughness
         else:
-            raise ValueError('Cannot find surface finish corresponding ' \
+            raise ValueError('Cannot find surface finish corresponding '
                              'to "{0:s}"'.format(surface))
 
     def nearest_dimensions_from_schedule(self, schedule, dnominal=0.0):
-        """Find dimensions closest to inner diameter or nominal diameter 
+        """Find dimensions closest to inner diameter or nominal diameter
         and given pipe schedule"""
         if dnominal > 0.0:
             try:
@@ -150,9 +144,9 @@ class Pipe(object):
                 self._odiameter = Do
                 self.idiameter = Di
             except:
-                raise ValueError('Cannot find dimensions corresponding ' \
-                                 'to {0:0.4f}-in nominal diameter and pipe ' \
-                                 'schedule "{1:s}"' \
+                raise ValueError('Cannot find dimensions corresponding '
+                                 'to {0:0.4f}-in nominal diameter and pipe '
+                                 'schedule "{1:s}"'
                                  .format(dnominal, schedule))
 
         else:
@@ -163,9 +157,9 @@ class Pipe(object):
                 self._odiameter = Do
                 self.idiameter = Di
             except:
-                raise ValueError('Cannot find dimensions corresponding ' \
-                                 'to {0:0.4e} m inner diameter and pipe ' \
-                                 'schedule "{1:s}"' \
+                raise ValueError('Cannot find dimensions corresponding '
+                                 'to {0:0.4e} m inner diameter and pipe '
+                                 'schedule "{1:s}"'
                                  .format(self.idiameter, schedule))
 
 #        raise ValueError('FAKE: NPS is {0:0.4f}'.format(NPS))
@@ -349,4 +343,3 @@ class Pipe(object):
         tbl += tabulate(cd_tuples, tablefmt=tablefmt)
 
         return tbl
-
