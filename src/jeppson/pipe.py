@@ -83,7 +83,8 @@ class Pipe(object):
         if nps > 0.0 and schedule:
             self.nearest_dimensions_from_schedule(schedule, nps)
         elif idiameter:
-            self.idiameter = idiameter
+            self._idiameter = idiameter
+            self._flow_area = sc.pi * self._idiameter**2 / 4.0
             if odiameter:
                 self._odiameter = odiameter
                 self._twall = (self._odiameter - self._idiameter) / 2.0
@@ -139,6 +140,76 @@ class Pipe(object):
 
         self._idiameter = idiameter
         self._flow_area = sc.pi * self._idiameter**2 / 4.0
+
+        if self._odiameter > 0.0:
+            twall = (idiameter - self._odiameter) / 2.0
+            if twall < 1.0E-4:
+                raise ValueError('Inner diameter smaller than outer diameter')
+            else:
+                self._twall = twall
+        elif self._twall > 0.0:
+            self._odiameter = self._idiameter + 2.0 * self._twall
+
+
+    @property
+    def odiameter(self):
+        """Outer diameter read accessor
+
+            Returns:
+                float: outer diameter, meters"""
+        return self._odiameter
+
+    @odiameter.setter
+    def odiameter(self, odiameter):
+        """Outer diameter accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for inner diameter."""
+        if odiameter < 1.0E-3:
+            raise ValueError('Outer diameter too small (<1mm)')
+        elif odiameter > 10.0:
+            raise ValueError('Outer diameter too large (>10m)')
+
+        self._odiameter = odiameter
+
+        if self._idiameter > 0.0:
+            if odiameter <= self._idiameter:
+                raise ValueError('Outer diameter smaller than inner diameter')
+            else:
+                self._twall = (self._odiameter - self._idiameter) / 2.0
+        elif self._twall > 0.0:
+            self._idiameter = self._odiameter - 2.0 * self._twall
+            self._flow_area = sc.pi * self._idiameter**2 / 4.0
+
+    @property
+    def twall(self):
+        """Wall thickness read accessor
+
+            Returns:
+                float: Wall thickness, meters"""
+        return self._twall
+
+    @twall.setter
+    def twall(self, twall):
+        """Wall thickness accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for wall thickness."""
+        if twall < 1.0E-4:
+            raise ValueError('Wall thickness too small (<0.1mm)')
+        elif twall > 1.0:
+            raise ValueError('Wall thickness too large (>1m)')
+
+        self._twall = twall
+        if self._idiameter > 0.0:
+            self._odiameter = self._idiameter + 2.0 * self._twall
+        elif self._odiameter > 0.0:
+            if 2.0 * self._twall - self._idiameter < 1.0E-4:
+                raise ValueError('Outer diameter smaller than twice '
+                                 'the wall thickness')
+            else:
+                self._idiameter = self._odiameter - 2.0 * self._twall
+                self._flow_area = sc.pi * self._idiameter**2 / 4.0
 
     @property
     def length(self):
@@ -308,7 +379,8 @@ class Pipe(object):
         self.nps = NPS
         self._twall = t
         self._odiameter = Do
-        self.idiameter = Di
+        self._idiameter = Di
+        self._flow_area = sc.pi * self._idiameter**2 / 4.0
 
     def as_table(self, tablefmt="psql",
                  headers=['length', 'idiameter', 'odiameter', 'twall',

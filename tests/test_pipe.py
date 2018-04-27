@@ -12,7 +12,8 @@ __license__ = "mit"
 
 def test_pipe():
     p1 = Pipe(label='Pipe 1', length=100.0 * sc.foot, 
-              idiameter=12.0 * sc.inch, eroughness=8.5E-4)
+              idiameter=12.0 * sc.inch, odiameter=12.5 * sc.inch,
+              eroughness=8.5E-4)
     assert p1.label == 'Pipe 1'
     assert p1.length == approx(30.48)
     assert p1.idiameter == approx(0.3048)
@@ -21,7 +22,8 @@ def test_pipe():
     assert p1.as_table(headers=['length', 'idiameter', 'eroughness'])
 
     p2 = Pipe(label='Pipe 2', length=100.0 * sc.foot, 
-              idiameter=12.0 * sc.inch, eroughness=8.5E-4)
+              idiameter=12.0 * sc.inch, twall=0.25 * sc.inch,
+              eroughness=8.5E-4)
 
     with raises(ValueError):
         p2.idiameter = 1.0E-4
