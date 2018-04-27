@@ -19,6 +19,8 @@ def test_pipe():
     assert p1.idiameter == approx(0.3048)
     assert p1.eroughness == approx(8.5E-4)
 
+    assert p1.as_table(headers=['length', 'idiameter', 'eroughness'])
+
     p2 = Pipe(label='Pipe 2', length=100.0 * sc.foot, 
               idiameter=12.0 * sc.inch, eroughness=8.5E-4, 
               zbottom=0.0, ztop=0.0)
@@ -47,6 +49,10 @@ def test_pipe():
     with raises(ValueError):
         p2.flow_area = 7.2965877E-2
         
+    with raises(ValueError):
+        p2.nearest_material_roughness('cheese', 'fouled')
+#    p2.nearest_material_roughness('%thf$fs', 'fouled')
+
     p2.nearest_material_roughness('cast iron', 'clean')
     assert p2.eroughness == approx(2.59E-4)
 
@@ -57,10 +63,17 @@ def test_pipe():
     assert p2._odiameter == approx(14.0 * sc.inch)
     assert p2.idiameter == approx(12.5 * sc.inch)
 
+    with raises(ValueError):
+        p2.nearest_dimensions_from_schedule(schedule='80', dnominal=120)
+
     p2.nearest_dimensions_from_schedule(schedule='80', dnominal=12)
     assert p2.idiameter == approx(11.38 * sc.inch, abs=1.0E-3)
     assert p2._odiameter == approx(12.75 * sc.inch, abs=1.0E-3)
     assert p2._twall == approx((p2._odiameter - p2.idiameter) / 2.0)
+
+    p2.idiameter = 36.0 * sc.inch
+    with raises(ValueError):
+        p2.nearest_dimensions_from_schedule(schedule='80')
 
     # 12" Schedule 80 pipe has a Di of 11.38", Do = 12.75", and twall = 0.68"
     p3 = Pipe(label='Pipe 3', length=10.0 * sc.foot, 
@@ -71,7 +84,22 @@ def test_pipe():
     assert p3._odiameter == approx(12.75 * sc.inch, abs=1.0E-3)
     assert p3._twall == approx((p3._odiameter - p3.idiameter) / 2.0)
 
-#    print(p1.as_table(headers=['length', 'idiameter', 'eroughness']))
+    # 12" Schedule 80 pipe has a Di of 11.38", Do = 12.75", and twall = 0.68"
+    p4 = Pipe(label='Pipe 4', length=10.0 * sc.foot, 
+              idiameter=11.37 * sc.inch, 
+              odiameter=12.75 * sc.inch, 
+              eroughness=8.5E-4, zbottom=0.0, ztop=0.0)
+
+    assert p4._twall == approx((p4._odiameter - p4.idiameter) / 2.0)
+
+    # 12" Schedule 80 pipe has a Di of 11.38", Do = 12.75", and twall = 0.68"
+    p5 = Pipe(label='Pipe 4', length=10.0 * sc.foot, 
+              idiameter=11.37 * sc.inch, 
+              twall=0.68 * sc.inch, 
+              eroughness=8.5E-4, zbottom=0.0, ztop=0.0)
+
+    assert p5._odiameter == approx(12.75 * sc.inch, abs=1.0E-3)
+
 #    assert fib(1) == 1
 #    assert fib(2) == 1
 #    assert fib(7) == 13

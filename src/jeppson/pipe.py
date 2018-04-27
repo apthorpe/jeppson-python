@@ -14,28 +14,46 @@ from tabulate import tabulate
 
 
 class Pipe(object):
-    """Simple control volume class """
+    """Simple pipe segment class
+
+    Attributes:
+        label (str): text description, mandatory.
+        length (float): length in meters, mandatory.
+        idiameter (float): pipe inner diameter in meters, mandatory.
+        eroughness (float): pipe relative roughness, mandatory.
+        zbottom (float): lower elevation (in meters) with respect to site
+                 zero, mandatory.
+        ztop (float): upper elevation (in meters) with respect to site zero,
+              mandatory.
+        twall (float): pipe wall thickness in meters. optional.
+        odiameter (float): outer pipe diameter in meters. optional.
+    """
+
     def __init__(self, label, length, idiameter, eroughness,
                  zbottom, ztop, schedule='', twall=0.0, odiameter=0.0):
         """Simple pipe segment constructor
 
-          All parameters are mandatory except schedule, twall, and odiameter.
-          Only one of the three are mandatory to set wall thickness.
+        All parameters are mandatory except schedule, twall, and odiameter.
+        only one of the three are mandatory to set wall thickness.
 
-          :param label: Text description, string, Mandatory.
-          :param length: Length in meters, real, Mandatory.
-          :param idiameter: Pipe inner diameter in meters, real, Mandatory.
-          :param eroughness: Pipe relative roughness, real, Mandatory.
-          :param zbottom: Lower elevation (in meters) with respect to site
-                          zero, real, Mandatory.
-          :param ztop: Upper elevation (in meters) with respect to site zero,
-                       real, Mandatory.
-          :param schedule: Pipe schedule, string, Optional.
-          :param twall: Pipe wall thickness in meters, real. Optional.
-          :param odiameter: Outer pipe diameter in meters, real. Optional.
+        Args:
+            label (str): text description, string, mandatory.
+            length (float): length in meters, mandatory.
+            idiameter (float): pipe inner diameter in meters, mandatory.
+            eroughness (float): pipe relative roughness, mandatory.
+            zbottom (float): lower elevation (in meters) with respect to site
+                     zero, mandatory.
+            ztop (float): upper elevation (in meters) with respect to site
+                zero, mandatory.
+            schedule (string): pipe schedule, optional.
+            twall (float): pipe wall thickness in meters. optional.
+            odiameter (float): outer pipe diameter in meters. optional.
+
+        Raises:
+            ValueError: An error occurred setting an attribute.
         """
 
-        # Set atmospheric composition (pressure, T, mole fractions)
+        # set atmospheric composition (pressure, t, mole fractions)
         self.label = label
         self.length = length
         self.idiameter = idiameter
@@ -64,7 +82,10 @@ class Pipe(object):
 
     @idiameter.setter
     def idiameter(self, idiameter):
-        """ Inner diameter accessor - write """
+        """Inner diameter accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for inner diameter."""
         if idiameter < 1.0E-3:
             raise ValueError('Inner diameter too small (<1mm)')
         elif idiameter > 10.0:
@@ -75,12 +96,15 @@ class Pipe(object):
 
     @property
     def length(self):
-        """ Inner diameter accessor - read """
+        """Inner diameter accessor - read """
         return self._length
 
     @length.setter
     def length(self, length):
-        """ Inner diameter accessor - write """
+        """Inner diameter accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for pipe length."""
         if length < 1.0E-3:
             raise ValueError('Length too small (<1mm)')
         elif length > 1000.0:
@@ -90,12 +114,15 @@ class Pipe(object):
 
     @property
     def eroughness(self):
-        """ Pipe wall roughness accessor - read """
+        """Pipe wall roughness accessor - read """
         return self._eroughness
 
     @eroughness.setter
     def eroughness(self, eroughness):
-        """ Pipe wall roughness accessor - write """
+        """Pipe wall roughness accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for relative roughness."""
         self._eroughness = eroughness
 
         if self._eroughness < 0.0:
@@ -105,37 +132,62 @@ class Pipe(object):
 
     @property
     def flow_area(self):
-        """ Pipe flow area - read """
+        """Pipe flow area - read """
         return self._flow_area
 
     @flow_area.setter
     def flow_area(self, flow_area):
-        """ Pipe flow area - write """
+        """Pipe flow area - write
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
         raise ValueError('Cannot directly set flow area; '
                          'value is derived from inner diameter')
 
     def nearest_material_roughness(self, surface, clean):
         """Find nearest surface roughness by surface finish name
-        and cleanliness"""
+        and cleanliness
+
+        Args:
+            surface (str): text description of pipe surface
+            clean (str): 'clean' or 'fouled'
+
+        Raises:
+            ValueError: Failed to find surface roughness for material
+                description."""
         surface_key = fv.nearest_material_roughness(surface, clean)
-        if surface_key:
-            eroughness = fv.material_roughness(surface_key)
+#    if surface_key:
+        lc_surface = str(surface).lower().strip()
+        lc_surface_key = str(surface_key).lower().strip()
+        if not (lc_surface in lc_surface_key):
+            raise ValueError('Surface specified "{0:s}" too different '
+                             'from surface found "{1:s}"'
+                             .format(surface, surface_key))
+        eroughness = fv.material_roughness(surface_key)
+        self.eroughness = eroughness
+# TODO Log msg so assumption is clear
 #            if clean:
 #                clean_tag = 'clean'
 #            else:
 #                clean_tag = 'fouled'
-# TODO Log msg so assumption is clear
 #            msg = "Note: Surface roughness set to {0:0.4E}; used '{1:s}' " \
 #                  "based on specification '{2:s}, {3:s}'".format(
 #                  eroughness, surface_key, surface, clean_tag)
-            self.eroughness = eroughness
-        else:
-            raise ValueError('Cannot find surface finish corresponding '
-                             'to "{0:s}"'.format(surface))
+#    else:
+#        raise ValueError('Cannot find surface finish corresponding '
+#                         'to "{0:s}"'.format(surface))
 
     def nearest_dimensions_from_schedule(self, schedule, dnominal=0.0):
         """Find dimensions closest to inner diameter or nominal diameter
-        and given pipe schedule"""
+        and given pipe schedule
+
+        Args:
+            schedule (str): Pipe schedule
+            dnominal (float): Nominal pipe diameter, inches.
+
+        Raises:
+            ValueError: Failed to find dimensions for given size and pipe
+                schedule."""
         if dnominal > 0.0:
             try:
                 (NPS, Di, Do, t) = fv.nearest_pipe(NPS=dnominal,
@@ -143,7 +195,7 @@ class Pipe(object):
                 self._twall = t
                 self._odiameter = Do
                 self.idiameter = Di
-            except:
+            except Exception:
                 raise ValueError('Cannot find dimensions corresponding '
                                  'to {0:0.4f}-in nominal diameter and pipe '
                                  'schedule "{1:s}"'
@@ -156,7 +208,7 @@ class Pipe(object):
                 self._twall = t
                 self._odiameter = Do
                 self.idiameter = Di
-            except:
+            except ValueError:
                 raise ValueError('Cannot find dimensions corresponding '
                                  'to {0:0.4e} m inner diameter and pipe '
                                  'schedule "{1:s}"'
@@ -336,7 +388,11 @@ class Pipe(object):
                  headers=['length', 'idiameter', 'odiameter',
                           'twall', 'schedule', 'eroughness',
                           'ztop', 'zbottom']):
-        """ Display object as table """
+        """ Display object as table
+
+            Args:
+                tablefmt (str): Table format; see `tabulate` documentation
+                headers ([str]): List of attributes to list in table"""
         tbl = "Pipe: {0:s}\n".format(self.label)
         cd_tuples = [(hdr, getattr(self, hdr)) for hdr in headers]
 
