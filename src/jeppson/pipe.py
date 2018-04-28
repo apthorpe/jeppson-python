@@ -18,6 +18,21 @@ LOG = logging.getLogger(__name__)
 class Pipe(object):
     """Simple pipe segment class
 
+    All parameters are optional except label and length.
+    A sensible combination of NPS and schedule or diameter, wall
+    thickness, and pipe schedule are needed to define radial pipe
+    dimensions. Similarly, relative pipe roughness may be set directly or
+    will be derived from surface and cleanliness or absolute roughness and
+    inner diameter. Relative roughness will be taken as zero (smooth,
+    clean pipe) unless otherwise specified.
+    
+    If insufficient parameters are specified in the constructor to completely
+    define radial geometry, the object will be left in an inconsistent state
+    which may cause the `as_table()` method to throw AttributeException errors.
+    This may be resolved by defining additional radial geometry attributes (any
+    two of `idiameter`, `odiameter`, and `twall`) or calling the
+    `nearest_dimensions_from_schedule()` method.
+
     Attributes:
         label (str): text description
         length (float): length in meters
@@ -30,6 +45,19 @@ class Pipe(object):
         surface (str): inner pipe surface material. Read only.
         clean (str): pipe cleanliness. Read only.
         eroughness (float): pipe relative roughness
+
+    Args:
+        label (str): text description, Mandatory.
+        length (float): length in meters. Mandatory.
+        idiameter (float): pipe inner diameter in meters. Optional.
+        odiameter (float): outer pipe diameter in meters. Optional.
+        twall (float): pipe wall thickness in meters. Optional.
+        nps (float): nominal pipe diameter, inches. Optional.
+        schedule (string): pipe schedule. Optional.
+        eroughness (float): relative pipe roughness. Optional.
+        froughness (float): absolute pipe roughness, in meters. Optional.
+        surface (str): inner pipe surface material. Optional.
+        is_clean (bool): pipe cleanliness. Optional.
     """
 # Not used yet; needed for facility modeling
 #        zbottom (float): lower elevation (in meters) with respect to site
