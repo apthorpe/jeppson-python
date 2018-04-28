@@ -5,14 +5,23 @@ from __future__ import absolute_import, division, print_function
 # from pprint import pprint
 
 # from collections import OrderedDict, defaultdict
-import logging
 # import pint
 
 import fluids.vectorized as fv
 import scipy.constants as sc
 from tabulate import tabulate
 
+import logging
+# Set default logging handler to avoid "No handler found" warnings.
+try:  # Python 2.7+
+    from logging import NullHandler
+except ImportError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+
 LOG = logging.getLogger(__name__)
+LOG.addHandler(NullHandler())
 
 
 class Pipe(object):
@@ -25,7 +34,7 @@ class Pipe(object):
     will be derived from surface and cleanliness or absolute roughness and
     inner diameter. Relative roughness will be taken as zero (smooth,
     clean pipe) unless otherwise specified.
-    
+
     If insufficient parameters are specified in the constructor to completely
     define radial geometry, the object will be left in an inconsistent state
     which may cause the `as_table()` method to throw AttributeException errors.
@@ -108,6 +117,8 @@ class Pipe(object):
 #        self._ztop = ztop
 
         # Set radial dimensions
+        errmsg = 'Pipe "{0:s}" is in an inconsistent state' \
+                 .format(self.label)
         if nps > 0.0 and schedule:
             self.nearest_dimensions_from_schedule(schedule, nps)
         elif idiameter:
@@ -128,6 +139,17 @@ class Pipe(object):
                              '{1:0.4E} m to match schedule {3:s}'
                              .format(label, idiameter, self._idiameter,
                                      schedule))
+            else:
+                LOG.warning(errmsg + ', only idiameter defined')
+        elif odiameter:
+            self._odiameter = odiameter
+            if twall:
+                self._twall = twall
+                self._idiameter = self.odiameter + 2.0 * twall
+            else:
+                LOG.warning(errmsg + ', only odiameter defined')
+        else:
+            LOG.warning(errmsg + ', no radial dimensions defined')
 
         # Set relative roughness
         if eroughness > 0.0:
@@ -183,6 +205,9 @@ class Pipe(object):
                 self._twall = twall
         elif hasattr(self, '_twall') and self._twall > 0.0:
             self._odiameter = self._idiameter + 2.0 * self._twall
+        else:
+            LOG.warning('Pipe "{0:s}" is in an inconsistent state, '
+                        'only idiameter set'.format(self.label))
 
     @property
     def odiameter(self):
@@ -216,6 +241,9 @@ class Pipe(object):
         elif hasattr(self, '_twall') and self._twall > 0.0:
             self._idiameter = self._odiameter - 2.0 * self._twall
             self._update_flow_area()
+        else:
+            LOG.warning('Pipe "{0:s}" is in an inconsistent state, '
+                        'only odiameter set'.format(self.label))
 
     @property
     def twall(self):
@@ -246,6 +274,9 @@ class Pipe(object):
             else:
                 self._idiameter = self._odiameter - 2.0 * self._twall
                 self._update_flow_area()
+        else:
+            LOG.warning('Pipe "{0:s}" is in an inconsistent state, '
+                        'only wall thickness set'.format(self.label))
 
     @property
     def length(self):
