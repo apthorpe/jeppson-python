@@ -25,11 +25,43 @@ def test_pipe():
               idiameter=12.0 * sc.inch, twall=0.25 * sc.inch,
               eroughness=8.5E-4)
 
+    assert p2.odiameter == approx(12.5 * sc.inch)
+    assert p2.twall == approx(0.25 * sc.inch)
+    assert p2.idiameter == approx(12.0 * sc.inch)
+    assert p2.flow_area == approx(7.2965877E-2)
+
+    p2.odiameter = 13.0 * sc.inch
+    assert p2.idiameter == approx(12.0 * sc.inch)
+    assert p2.odiameter == approx(13.0 * sc.inch)
+    assert p2.twall == approx(0.5 * sc.inch)
+
+    p2.twall = 0.25 * sc.inch
+    assert p2.idiameter == approx(12.0 * sc.inch)
+    assert p2.odiameter == approx(12.5 * sc.inch)
+    assert p2.twall == approx(0.25 * sc.inch)
+
+    p2.idiameter = 12.25 * sc.inch
+    assert p2.idiameter == approx(12.25 * sc.inch)
+    assert p2.odiameter == approx(12.5 * sc.inch)
+    assert p2.twall == approx(0.125 * sc.inch)
+
     with raises(ValueError):
         p2.idiameter = 1.0E-4
 
     with raises(ValueError):
         p2.idiameter = 11.0
+
+    with raises(ValueError):
+        p2.odiameter = 1.0E-4
+
+    with raises(ValueError):
+        p2.odiameter = 11.0
+
+    with raises(ValueError):
+        p2.twall = 1.0E-6
+
+    with raises(ValueError):
+        p2.twall = 1.01
 
     with raises(ValueError):
         p2.eroughness = -1.0E-6
@@ -42,9 +74,6 @@ def test_pipe():
 
     with raises(ValueError):
         p2.length = 1001.0
-
-    assert p2.idiameter == approx(0.3048)
-    assert p2.flow_area == approx(7.2965877E-2)
 
     with raises(ValueError):
         p2.flow_area = 7.2965877E-2
@@ -70,6 +99,7 @@ def test_pipe():
     assert p2._odiameter == approx(12.75 * sc.inch, abs=1.0E-3)
     assert p2._twall == approx((p2._odiameter - p2.idiameter) / 2.0)
 
+    p2.odiameter = 38.0 * sc.inch
     p2.idiameter = 36.0 * sc.inch
     with raises(ValueError):
         p2.nearest_dimensions_from_schedule(schedule='80')
@@ -134,5 +164,19 @@ def test_pipe():
               schedule='80', nps=12, surface='Steel tubes', is_clean=False)
 
     assert p7.eroughness == approx(1.0E-3)
+
+    p8 = Pipe(label='Pipe 8', length=30.0 * sc.foot)
+    p8.twall = 0.5 * sc.inch
+    p8.idiameter = 12 * sc.inch
+    assert p8.idiameter == approx(12 * sc.inch)
+    assert p8.odiameter == approx(13 * sc.inch)
+    assert p8.twall == approx(0.5 * sc.inch)
+
+    p8 = Pipe(label='Pipe 8', length=30.0 * sc.foot)
+    p8.twall = 0.5 * sc.inch
+    p8.odiameter = 13 * sc.inch
+    assert p8.idiameter == approx(12 * sc.inch)
+    assert p8.odiameter == approx(13 * sc.inch)
+    assert p8.twall == approx(0.5 * sc.inch)
 
     return

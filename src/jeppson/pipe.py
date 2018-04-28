@@ -84,7 +84,7 @@ class Pipe(object):
             self.nearest_dimensions_from_schedule(schedule, nps)
         elif idiameter:
             self._idiameter = idiameter
-            self._flow_area = sc.pi * self._idiameter**2 / 4.0
+            self._update_flow_area()
             if odiameter:
                 self._odiameter = odiameter
                 self._twall = (self._odiameter - self._idiameter) / 2.0
@@ -119,6 +119,10 @@ class Pipe(object):
                 self._surface = surface.strip()
                 self.nearest_material_roughness(surface, is_clean)
 
+    def _update_flow_area(self):
+        """Internal method to update flow area on a change to inner diameter"""
+        self._flow_area = sc.pi * self._idiameter**2 / 4.0
+
     @property
     def idiameter(self):
         """Inner diameter read accessor
@@ -139,17 +143,18 @@ class Pipe(object):
             raise ValueError('Inner diameter too large (>10m)')
 
         self._idiameter = idiameter
-        self._flow_area = sc.pi * self._idiameter**2 / 4.0
+        self._update_flow_area()
 
-        if self._odiameter > 0.0:
-            twall = (idiameter - self._odiameter) / 2.0
-            if twall < 1.0E-4:
-                raise ValueError('Inner diameter smaller than outer diameter')
+        if hasattr(self, '_odiameter') and self._odiameter > 0.0:
+            twall = (self._odiameter - idiameter) / 2.0
+            if twall <= 0.0:
+                raise ValueError('Inner diameter larger than outer diameter')
+            elif twall < 1.0E-4:
+                raise ValueError('Pipe wall too thin (<0.1mm)')
             else:
                 self._twall = twall
-        elif self._twall > 0.0:
+        elif hasattr(self, '_twall') and self._twall > 0.0:
             self._odiameter = self._idiameter + 2.0 * self._twall
-
 
     @property
     def odiameter(self):
@@ -172,14 +177,17 @@ class Pipe(object):
 
         self._odiameter = odiameter
 
-        if self._idiameter > 0.0:
-            if odiameter <= self._idiameter:
+        if hasattr(self, '_idiameter') and self._idiameter > 0.0:
+            twall = (odiameter - self._idiameter) / 2.0
+            if twall <= 0.0:
                 raise ValueError('Outer diameter smaller than inner diameter')
+            elif twall < 1.0E-4:
+                raise ValueError('Pipe wall too thin (<0.1mm)')
             else:
-                self._twall = (self._odiameter - self._idiameter) / 2.0
-        elif self._twall > 0.0:
+                self._twall = twall
+        elif hasattr(self, '_twall') and self._twall > 0.0:
             self._idiameter = self._odiameter - 2.0 * self._twall
-            self._flow_area = sc.pi * self._idiameter**2 / 4.0
+            self._update_flow_area()
 
     @property
     def twall(self):
@@ -201,15 +209,15 @@ class Pipe(object):
             raise ValueError('Wall thickness too large (>1m)')
 
         self._twall = twall
-        if self._idiameter > 0.0:
+        if hasattr(self, '_idiameter') and self._idiameter > 0.0:
             self._odiameter = self._idiameter + 2.0 * self._twall
-        elif self._odiameter > 0.0:
+        elif hasattr(self, '_odiameter') and self._odiameter > 0.0:
             if 2.0 * self._twall - self._idiameter < 1.0E-4:
                 raise ValueError('Outer diameter smaller than twice '
                                  'the wall thickness')
             else:
                 self._idiameter = self._odiameter - 2.0 * self._twall
-                self._flow_area = sc.pi * self._idiameter**2 / 4.0
+                self._update_flow_area()
 
     @property
     def length(self):
@@ -380,7 +388,7 @@ class Pipe(object):
         self._twall = t
         self._odiameter = Do
         self._idiameter = Di
-        self._flow_area = sc.pi * self._idiameter**2 / 4.0
+        self._update_flow_area()
 
     def as_table(self, tablefmt="psql",
                  headers=['length', 'idiameter', 'odiameter', 'twall',
