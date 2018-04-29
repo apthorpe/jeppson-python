@@ -1,25 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This is a skeleton file that can serve as a starting point for a Python
-console script. To run this script uncomment the following line in the
-entry_points section in setup.py:
+This reimplements the pipe flow analysis program given in chapter 2 of *Steady
+Flow Analysis of Pipe Networks: An Instructional Manual* (1974). *Reports.*
+Paper 300.  http://digitalcommons.usu.edu/water_rep/300 and *Analysis of Flow
+in Pipe Networks* (1976). Ann Arbor Science Publishers, Inc.
+http://www.worldcat.org/title/analysis-of-flow-in-pipe-networks/oclc/927534147
+by Roland W. Jeppson.
 
-    [console_scripts]
-    fibonacci = jeppson.skeleton:run
-
-Then run `python setup.py install` which will install the command `fibonacci`
+Then run `python setup.py install` which will install the command `jeppson_ch2`
 inside your current environment.
-Besides console scripts, the header (i.e. until _logger...) of this file can
-also be used as template for Python modules.
-
-Note: This skeleton file can be safely removed if not needed!
 """
 from __future__ import division, print_function, absolute_import
 
 import argparse
-import sys
 import logging
+import sys
+
+import iapws
 
 from jeppson import __version__
 
@@ -56,16 +54,18 @@ def parse_args(args):
       :obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser(
-        description="Just a Fibonnaci demonstration")
+        description="Frictional head loss calculator")
     parser.add_argument(
         '--version',
         action='version',
         version='jeppson-python {ver}'.format(ver=__version__))
     parser.add_argument(
-        dest="n",
-        help="n-th Fibonacci number",
-        type=int,
-        metavar="INT")
+        dest="file",
+        help="input files (STDIN if not specified)",
+        type=argparse.FileType('r'),
+        nargs='*',
+        default=[sys.stdin],
+        metavar="FILE")
     parser.add_argument(
         '-v',
         '--verbose',
@@ -102,9 +102,57 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    _logger.debug("Starting crazy calculations...")
-    print("The {}-th Fibonacci number is {}".format(args.n, fib(args.n)))
-    _logger.info("Script ends here")
+    _logger.info("Starting jeppson_ch2")
+
+    for fh in args.file:
+        print("Processing file: {0:s}".format(fh.name))
+#    print("The {}-th Fibonacci number is {}".format(args.n, fib(args.n)))
+
+        for ict, rawline in enumerate(fh):
+            line = rawline.strip()
+            token = line.split()
+            if token:
+                if token[0].startswith('#'):
+                    print("Line {}: [C] {}".format(ict, line))
+                else:
+                    print("Line {}: [D] {}".format(ict, line))
+                    if len(token) >= 6:
+                        print("  Enough parts.")
+                    else:
+                        print("  TOO FEW PARTS.")
+            else:
+                print("Line {}: [B]".format(ict))
+
+#     do
+#         ! 1) Read flow conditions and pipe geometry
+#         ! D   - Pipe diameter, ft
+#         ! Q   - Flow rate, cfs
+#         ! FL  - Length of pipe, ft
+#         ! VIS - Kinematic viscosity of fluid (nu)
+#         ! E   - Absolute roughness of pipe, ft
+#         ! G   - Acceleration of gravity, ft/s**2
+#         read(STDIN, 100, end=99) D, Q, FL, VIS, E, G
+# 
+#         ! 2) Calculate friction factor
+#         F = f_darcy_weisbach(Q, D, E, VIS, PARLIM, MAXITER, MAXDIF)
+# 
+#         ! 3) Calculate bulk flow velocity
+#         V = Q / circ_area(D)
+# 
+#         ! 4) Calculate head loss
+#         HL = F * FL * V * V / (2.0 * G * D)
+# 
+#         ! 5) Display results
+#         ! Q  - Flow rate, cfs
+#         ! D  - Pipe diameter, ft
+#         ! FL - Length of pipe, ft
+#         ! F  - Darcy-Weisbach friction factor
+#         ! HL - Head loss along pipe, ft
+#         write(STDOUT, 101) Q, D, FL, F, HL
+# 
+#     end do
+
+    _logger.info("Ending jeppson_ch2")
 
 
 def run():
