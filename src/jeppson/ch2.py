@@ -16,6 +16,7 @@ from __future__ import division, print_function, absolute_import
 import argparse
 # from collections import namedtuple
 import logging
+import math
 import sys
 
 # import iapws
@@ -31,12 +32,13 @@ __license__ = "mit"
 
 _logger = logging.getLogger(__name__)
 
+
 class InputLine(dict):
     """ Categorized and tokenized user input for Jeppson Ch. 2 friction factor
         and head loss calculator.
 
         All attributes are immutable except ``ipos``.
-        
+
         Attributes:
             line (str): Original line of input text with newline(s) removed
             type (str): One of 'blank', 'comment', or 'data'
@@ -45,7 +47,7 @@ class InputLine(dict):
             ntok (int): Number of tokens found (0 except for 'data' lines)
             token ([str]): Tokens parsed from line ('data' lines only,
               otherwise empty)
-   
+
         Args:
             line (str): Original line of input text with newline(s) removed
             ipos (int): Line number in original file
@@ -78,7 +80,7 @@ class InputLine(dict):
     @property
     def line(self):
         """Line read accessor
-        
+
             Returns:
                 (str): Original input line stripped of line terminators
         """
@@ -95,7 +97,7 @@ class InputLine(dict):
     @property
     def type(self):
         """Type read accessor
-        
+
             Returns:
                 (str): Type of input line; one of 'blank', 'comment', or 'data'
         """
@@ -104,7 +106,7 @@ class InputLine(dict):
     @property
     def typecode(self):
         """Type code read accessor
-        
+
             Returns:
                 (str): Type code of input line; one of 'B', 'C', or 'D',
                   corresponding to 'blank', 'comment', or 'data', respectively
@@ -114,7 +116,7 @@ class InputLine(dict):
     @property
     def ntok(self):
         """Token count read accessor
-        
+
             Returns:
                 (int): Number of tokens found (0 except for 'data' lines)
         """
@@ -123,7 +125,7 @@ class InputLine(dict):
     @property
     def token(self):
         """Token list read accessor
-        
+
             Returns:
                 ([str]): Tokens parsed from line ('data' lines only, otherwise
                   empty)
@@ -134,6 +136,7 @@ class InputLine(dict):
         """Return line number (ipos), type code, and original line to assist
         in finding input errors. Type code is 'B', 'C', or 'D', corresponding
         to 'blank', 'comment', and 'data', respectively
+
             Args:
                 logfmt (str): Format string for producing log output. Field 0
                   is the `ipos` attribute, field 1 is the type code, and field
@@ -211,188 +214,368 @@ def setup_logging(loglevel):
                         format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
 
 
-# def tokenize_line(line):
-#     """Returns non-blank substrings of a string
-# 
-#     Args:
-#       line (str): target string
-# 
-#     Returns:
-#       token ([str]): non-blank substrings (tokens). May be empty.
-#     """
-#     token = line.strip().split()
-#     return token
-# 
-# 
-# def categorize_line(line, commentchar='#'):
-#     """Determines if line is blank, comment, or data and returns number of
-#     token detected and list of tokens.
-# 
-#     Args:
-#       line (str): target string
-#       commentchar (str): leading character/string indicating a line is a
-#         comment
-# 
-#     Returns:
-#       tag (str): line type. One of 'blank', 'comment', or 'data'
-#       ntok (int): number of tokens found. Nay be zero.
-#       token ([str]): non-blank substrings (tokens). May be empty.
-#     """
-#     tag = 'unknown'
-#     token = tokenize_line(line)
-#     if token:
-#         if commentchar and token[0].startswith(commentchar):
-#             tag = 'comment'
-#         else:
-#             tag = 'data'
-#     else:
-#         tag = 'blank'
-# 
-#     ntok = len(token)
-# 
-#     return tag, ntok, token
-
 def extract_case_input(iline, force_units=None):
     """Extract and validate case input from pre-processed data line
 
         Args:
             iline (InputLine): Pre-processed input data line
             force_units (str): Unit system of input data. Accepted values are
-              'SI' (mks) and 'Traditional' (foot-pound-second). If left undefined,
-              units will be inferred from gravitational acceleration.
+              'SI' (mks) and 'Traditional' (foot-pound-second). If left
+              undefined, units will be inferred from gravitational
+              acceleration.
 
         Returns:
             (dict): Case input data and metadata"""
-
-    return {}
-
-
-def process_ch2_case(ntok, token):
-    """Generate results from tokenized data
-
-    Args:
-      ntok (int): number of data tokens
-      token ([str]): tokens parsed from data line.
-        Contains at least one token
-
-    Returns:
-      (dict): Calculation results and diagnostic info
-    """
     mintok = 6
 
     ikeys = (
-        'volumetric flowrate', 'pipe inner diameter', 'pipe length',
-        'kinematic viscosity', 'absolute pipe roughness',
-        'gravitational acceleraction', 'flow velocity', 'reynolds number'
-    )
-    okeys = (
-        'darcy friction factor', 'head loss'
+        'pipe inner diameter',
+        'volumetric flowrate',
+        'pipe length',
+        'kinematic viscosity',
+        'absolute pipe roughness',
+        'gravitational acceleration'
     )
 
+    unitconv = (
+        sc.foot,
+        sc.foot**3,
+        sc.foot,
+        sc.foot**2,
+        sc.foot,
+        sc.foot
+    )
+
+    # Set default results
     results = {
         'status': 'undefined',
         'msg':    'No results generated yet',
         'units':  '',
-        'input':  {},
-        'output': {}
+        'input':  {}
     }
 
     for kk in ikeys:
         results['input'][kk] = float('NaN')
 
-    for kk in okeys:
-        results['output'][kk] = float('NaN')
-
-    if ntok < mintok:
+    # Check number of tokens
+    if iline.ntok < mintok:
         results['status'] = 'error'
         results['msg'] = 'Too few tokens ({} found, {} expected)' \
-                         .format(ntok, mintok)
+                         .format(iline.ntok, mintok)
         return results
 
-    if ntok > mintok:
+    if iline.ntok > mintok:
         results['status'] = 'warning'
         results['msg'] = 'Too many tokens ({} found, {} expected)' \
-                         .format(ntok, mintok)
+                         .format(iline.ntok, mintok)
     else:
         results['status'] = 'ok'
         results['msg'] = 'Proper token count ({})'.format(mintok)
 
-    try:
-        # D   - Pipe diameter, ft
-        idiameter = float(token[0])
-        # Q   - Flow rate, cfs
-        vol_flowrate = float(token[1])
-        # FL  - Length of pipe, ft
-        length = float(token[2])
-        # VIS - Kinematic viscosity of fluid (nu)
-        kin_visc = float(token[3])
-        # E   - Absolute roughness of pipe, ft
-        froughness = float(token[4])
-        # G   - Acceleration of gravity, ft/s**2
-        agrav = float(token[5])
-    except ValueError as err:
-        _logger.error("Numeric parse failure: {0:s}".format(str(err)))
-        results['status'] = 'error'
-        results['msg'] = 'Cannot parse values from input line'
-        return results
+    # Convert tokens to floats; check for parsing errors
+    for i, kk in enumerate(ikeys):
+        try:
+            results['input'][kk] = float(iline.token[i])
+        except ValueError as err:
+            _logger.error('Numeric parse failure, field {0:d}, "{1:s}": {2:s}'
+                          .format(i, kk, str(err)))
+            results['status'] = 'error'
+            results['msg'] = 'Cannot parse values from input line, field ' \
+                             '{0:d}, "{1:s}"'.format(i, kk)
+            return results
 
-    if abs(agrav - sc.g) / sc.g < 0.1:
+        if math.isnan(results['input'][kk]):
+            _logger.error('Numeric parse failure, field {0:d}, "{1:s}"'
+                          .format(i, kk))
+            results['status'] = 'error'
+            results['msg'] = 'Cannot parse values from input line, field ' \
+                             '{0:d}, "{1:s}"'.format(i, kk)
+            return results
+
+    # Select units via heuristic (within 10% of SI gravitational acceleration)
+    if abs(results['input']['gravitational acceleration'] - sc.g) / sc.g < 0.1:
         _logger.info("Assuming SI units")
         results['units'] = 'SI'
     else:
         _logger.info("Assuming traditional units (US/English)")
         results['units'] = 'traditional'
-        idiameter *= sc.foot
-        vol_flowrate *= sc.foot**3
-        length *= sc.foot
-        kin_visc *= sc.foot**2
-        froughness *= sc.foot
-        agrav *= sc.foot
 
-    _logger.debug('idiameter = {0:0.4E} m'.format(idiameter))
-    _logger.debug('vol_flowrate = {0:0.4E} m3/s'.format(vol_flowrate))
-    _logger.debug('length = {0:0.4E} m'.format(length))
-    _logger.debug('kin_visc = {0:0.4E} m2/s'.format(kin_visc))
-    _logger.debug('froughness = {0:0.4E} m'.format(froughness))
-    _logger.debug('agrav = {0:0.4E} m/s2'.format(agrav))
+    # Attempt to coerce units
+    if force_units:
+        if force_units.trim().upper() == 'SI':
+            _logger.info("Forcing use of SI units")
+            results['units'] = 'SI'
+        elif force_units.trim().lower() == 'traditional':
+            _logger.info("Forcing use of traditional units")
+            results['units'] = 'traditional'
+        else:
+            msg = 'Cannot force units of measure to "{0:s}"' \
+                  .format(force_units)
+            _logger.warning(msg)
+            if results['status'] == 'ok':
+                results['status'] = 'warning'
+                results['msg'] = msg
+            # pass through; use inferred units
 
-    twall = 0.1 * idiameter
+    # Convert units
+    if results['units'] == 'traditional':
+        for i, fconv in enumerate(unitconv):
+            results['input'][ikeys[i]] *= fconv
+
+    for kk in ikeys:
+        _logger.debug('{0:s} = {1:0.4E}'.format(kk, results['input'][kk]))
+
+    return results
+
+
+def calculate_headloss(kwinput):
+    """Generate head loss and Darcy-Weisbach friction factor from processed
+    input. Intermediate and final results will be returned with metadata
+
+    Args:
+      kwinput (dict): A dict with the following keys with values in SI units:
+        ``volumetric flowrate``, ``pipe inner diameter``, ``pipe length``,
+        ``kinematic viscosity``, ``absolute pipe roughness``,
+        and ``gravitational acceleration``
+
+    Returns:
+      (dict): Calculation results in SI units and diagnostic info
+    """
+    ikeys = (
+        'volumetric flowrate',
+        'pipe inner diameter',
+        'pipe length',
+        'kinematic viscosity',
+        'absolute pipe roughness',
+        'gravitational acceleration'
+    )
+    dkeys = (
+        'flow area',
+        'relative pipe roughness',
+        'flow velocity',
+        'reynolds number'
+    )
+    okeys = ('darcy friction factor', 'head loss')
+
+    _logger.debug('Calculating head loss and friction factor')
+
+    # Set up results structure
+    results = {
+        'status':  'undefined',
+        'msg':     'No results generated yet',
+        'input':   {},
+        'derived': {},
+        'output':  {}
+    }
+
+#    _logger.debug('Input object echo')
+#     for kk in kwinput:
+#         _logger.debug('{0:s} is {1:0.4E}'.format(kk, kwinput[kk]))
+
+    for kk in dkeys:
+        results['derived'][kk] = float('NaN')
+
+    for kk in okeys:
+        results['output'][kk] = float('NaN')
+
+    for kk in ikeys:
+        if kk in kwinput:
+            results['input'][kk] = kwinput[kk]
+            _logger.debug('{0:s} is {1:0.4E}'
+                          .format(kk, results['input'][kk]))
+        else:
+            _logger.debug('Cannot find {0:s} in input'.format(kk))
+            # Record the first error
+            if results['status'] != 'error':
+                results['status'] = 'error'
+                results['msg'] = 'Required input "{0:s}" not specified' \
+                    .format(kk)
+
+    if results['status'] == 'error':
+        return results
+
+    # Alias the parameter dicts
+    idata = results['input']
+    ddata = results['derived']
+    odata = results['output']
+
+    # Arbitrary wall thickness to ensure complete pipe object definition
+    twall = 0.1 * idata['pipe inner diameter']
     try:
-        pipe = Pipe(label='Example pipe', length=length, idiameter=idiameter,
-                    twall=twall, froughness=froughness)
+        pipe = Pipe(label='Example pipe', length=idata['pipe length'],
+                    idiameter=idata['pipe inner diameter'],
+                    twall=twall, froughness=idata['absolute pipe roughness'])
     except ValueError as err:
         results['status'] = 'error'
         results['msg'] = 'Cannot model pipe: {0:s}'.format(str(err))
         return results
 
     # Calculate results
-    vflow = vol_flowrate / pipe.flow_area
-    Re = vflow * pipe.idiameter / kin_visc
-    friction = friction_factor(Re, eD=pipe.eroughness)
-    head_loss = friction * pipe.length * vflow**2 \
-        / (2.0 * agrav * pipe.idiameter)
+    ddata['flow area'] = pipe.flow_area
+    ddata['relative pipe roughness'] = pipe.eroughness
+    ddata['flow velocity'] = idata['volumetric flowrate'] / ddata['flow area']
+    ddata['reynolds number'] = \
+        ddata['flow velocity'] * idata['pipe inner diameter'] \
+        / idata['kinematic viscosity']
+    odata['darcy friction factor'] = \
+        friction_factor(Re=ddata['reynolds number'],
+                        eD=ddata['relative pipe roughness'])
+    odata['head loss'] = \
+        (odata['darcy friction factor'] * idata['pipe length']
+         * ddata['flow velocity']**2) \
+        / (2.0 * idata['gravitational acceleration']
+           * idata['pipe inner diameter'])
 
-    # Package results
-    results['input']['volumetric flowrate'] = vol_flowrate
-    results['input']['pipe inner diameter'] = pipe.idiameter
-    results['input']['pipe length'] = pipe.length
-    results['input']['kinematic viscosity'] = kin_visc
-    results['input']['absolute pipe roughness'] = froughness
-    results['input']['gravitational acceleraction'] = agrav
-    results['input']['flow velocity'] = vflow
-    results['input']['reynolds number'] = Re
-    results['output']['darcy friction factor'] = friction
-    results['output']['head loss'] = head_loss
+    results['status'] = 'ok'
+    results['msg'] = 'Calculation complete'
 
+    # Diagnostics/audit trail
+    _logger.debug('Input values:')
     for kk in ikeys:
         _logger.debug('{0:s} = {1:0.4E}'
                       .format(kk, results['input'][kk]))
 
+    _logger.debug('Derived values:')
+    for kk in dkeys:
+        _logger.debug('{0:s} = {1:0.4E}'
+                      .format(kk, results['derived'][kk]))
+
+    _logger.debug('Output values:')
     for kk in okeys:
         _logger.debug('{0:s} = {1:0.4E}'
                       .format(kk, results['output'][kk]))
 
+    _logger.debug(results['status'] + ': ' + results['msg'])
+
     return results
+
+
+# def process_ch2_case(ntok, token):
+#     """Generate results from tokenized data
+#
+#     Args:
+#       ntok (int): number of data tokens
+#       token ([str]): tokens parsed from data line.
+#         Contains at least one token
+#
+#     Returns:
+#       (dict): Calculation results and diagnostic info
+#     """
+#     mintok = 6
+#
+#     ikeys = (
+#         'volumetric flowrate', 'pipe inner diameter', 'pipe length',
+#         'kinematic viscosity', 'absolute pipe roughness',
+#         'gravitational acceleration', 'flow velocity', 'reynolds number'
+#     )
+#     okeys = (
+#         'darcy friction factor', 'head loss'
+#     )
+#
+#     results = {
+#         'status': 'undefined',
+#         'msg':    'No results generated yet',
+#         'units':  '',
+#         'input':  {},
+#         'output': {}
+#     }
+#
+#     for kk in ikeys:
+#         results['input'][kk] = float('NaN')
+#
+#     for kk in okeys:
+#         results['output'][kk] = float('NaN')
+#
+#     if ntok < mintok:
+#         results['status'] = 'error'
+#         results['msg'] = 'Too few tokens ({} found, {} expected)' \
+#                          .format(ntok, mintok)
+#         return results
+#
+#     if ntok > mintok:
+#         results['status'] = 'warning'
+#         results['msg'] = 'Too many tokens ({} found, {} expected)' \
+#                          .format(ntok, mintok)
+#     else:
+#         results['status'] = 'ok'
+#         results['msg'] = 'Proper token count ({})'.format(mintok)
+#
+#     try:
+#         # D   - Pipe diameter, ft
+#         idiameter = float(token[0])
+#         # Q   - Flow rate, cfs
+#         vol_flowrate = float(token[1])
+#         # FL  - Length of pipe, ft
+#         length = float(token[2])
+#         # VIS - Kinematic viscosity of fluid (nu)
+#         kin_visc = float(token[3])
+#         # E   - Absolute roughness of pipe, ft
+#         froughness = float(token[4])
+#         # G   - Acceleration of gravity, ft/s**2
+#         agrav = float(token[5])
+#     except ValueError as err:
+#         _logger.error("Numeric parse failure: {0:s}".format(str(err)))
+#         results['status'] = 'error'
+#         results['msg'] = 'Cannot parse values from input line'
+#         return results
+#
+#     if abs(agrav - sc.g) / sc.g < 0.1:
+#         _logger.info("Assuming SI units")
+#         results['units'] = 'SI'
+#     else:
+#         _logger.info("Assuming traditional units (US/English)")
+#         results['units'] = 'traditional'
+#         idiameter *= sc.foot
+#         vol_flowrate *= sc.foot**3
+#         length *= sc.foot
+#         kin_visc *= sc.foot**2
+#         froughness *= sc.foot
+#         agrav *= sc.foot
+#
+#     _logger.debug('idiameter = {0:0.4E} m'.format(idiameter))
+#     _logger.debug('vol_flowrate = {0:0.4E} m3/s'.format(vol_flowrate))
+#     _logger.debug('length = {0:0.4E} m'.format(length))
+#     _logger.debug('kin_visc = {0:0.4E} m2/s'.format(kin_visc))
+#     _logger.debug('froughness = {0:0.4E} m'.format(froughness))
+#     _logger.debug('agrav = {0:0.4E} m/s2'.format(agrav))
+#
+#     twall = 0.1 * idiameter
+#     try:
+#         pipe = Pipe(label='Example pipe', length=length, idiameter=idiameter,
+#                     twall=twall, froughness=froughness)
+#     except ValueError as err:
+#         results['status'] = 'error'
+#         results['msg'] = 'Cannot model pipe: {0:s}'.format(str(err))
+#         return results
+#
+#     # Calculate results
+#     vflow = vol_flowrate / pipe.flow_area
+#     Re = vflow * pipe.idiameter / kin_visc
+#     friction = friction_factor(Re, eD=pipe.eroughness)
+#     head_loss = friction * pipe.length * vflow**2 \
+#         / (2.0 * agrav * pipe.idiameter)
+#
+#     # Package results
+#     results['input']['volumetric flowrate'] = vol_flowrate
+#     results['input']['pipe inner diameter'] = pipe.idiameter
+#     results['input']['pipe length'] = pipe.length
+#     results['input']['kinematic viscosity'] = kin_visc
+#     results['input']['absolute pipe roughness'] = froughness
+#     results['input']['gravitational acceleration'] = agrav
+#     results['input']['flow velocity'] = vflow
+#     results['input']['reynolds number'] = Re
+#     results['output']['darcy friction factor'] = friction
+#     results['output']['head loss'] = head_loss
+#
+#     for kk in ikeys:
+#         _logger.debug('{0:s} = {1:0.4E}'
+#                       .format(kk, results['input'][kk]))
+#
+#     for kk in okeys:
+#         _logger.debug('{0:s} = {1:0.4E}'
+#                       .format(kk, results['output'][kk]))
+#
+#     return results
 
 
 def main(args):
@@ -423,7 +606,10 @@ def main(args):
 
             if iline.typecode == 'D':
                 _logger.debug('Processing data line')
-                results = process_ch2_case(iline.ntok, iline.token)
+                indat = extract_case_input(iline)
+                results = calculate_headloss(indat['input'])
+
+#                results = process_ch2_case(iline.ntok, iline.token)
 
                 if results['status'] == 'ok':
                     _logger.debug('Case processed successfully')
