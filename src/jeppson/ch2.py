@@ -24,6 +24,7 @@ import scipy.constants as sc
 from fluids.friction import friction_factor
 
 from jeppson.pipe import Pipe
+from jeppson.input import InputLine
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
@@ -31,121 +32,6 @@ __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
 _logger = logging.getLogger(__name__)
-
-
-class InputLine(dict):
-    """ Categorized and tokenized user input for Jeppson Ch. 2 friction factor
-        and head loss calculator.
-
-        All attributes are immutable except ``ipos``.
-
-        Attributes:
-            line (str): Original line of input text with newline(s) removed
-            type (str): One of 'blank', 'comment', or 'data'
-            typecode (str): One of 'B', 'C', or 'D', corresponding to type
-            ipos (int): Line number in original file (count starts at 1)
-            ntok (int): Number of tokens found (0 except for 'data' lines)
-            token ([str]): Tokens parsed from line ('data' lines only,
-              otherwise empty)
-
-        Args:
-            line (str): Original line of input text with newline(s) removed
-            ipos (int): Line number in original file
-            commentchar (str): leading character/string denoting that a line is
-              a comment
-    """
-
-    def __init__(self, line, ipos=0, commentchar='#'):
-        """Constructor """
-        self.ipos = ipos
-
-        self._line = line.rstrip('\r\n')
-        self._type = 'unknown'
-        self._ntok = 0
-        self._token = ()
-
-        tline = self._line.strip()
-        ltline = len(tline)
-
-        if ltline == 0:
-            self._type = 'blank'
-        else:
-            if commentchar and self._line.startswith(commentchar):
-                self._type = 'comment'
-            else:
-                self._type = 'data'
-                self._token = tline.split()
-                self._ntok = len(self.token)
-
-    @property
-    def line(self):
-        """Line read accessor
-
-            Returns:
-                (str): Original input line stripped of line terminators
-        """
-        return self._line
-
-#    @line.setter
-#    def line(self, line):
-#        """Line write accessor
-#            Raises:
-#                ValueError
-#        """
-#        return self._line
-
-    @property
-    def type(self):
-        """Type read accessor
-
-            Returns:
-                (str): Type of input line; one of 'blank', 'comment', or 'data'
-        """
-        return self._type
-
-    @property
-    def typecode(self):
-        """Type code read accessor
-
-            Returns:
-                (str): Type code of input line; one of 'B', 'C', or 'D',
-                  corresponding to 'blank', 'comment', or 'data', respectively
-        """
-        return self._type[0].upper()
-
-    @property
-    def ntok(self):
-        """Token count read accessor
-
-            Returns:
-                (int): Number of tokens found (0 except for 'data' lines)
-        """
-        return self._ntok
-
-    @property
-    def token(self):
-        """Token list read accessor
-
-            Returns:
-                ([str]): Tokens parsed from line ('data' lines only, otherwise
-                  empty)
-        """
-        return self._token
-
-    def as_log(self, logfmt='{0:-6d} [{1:s}] {2:s}'):
-        """Return line number (ipos), type code, and original line to assist
-        in finding input errors. Type code is 'B', 'C', or 'D', corresponding
-        to 'blank', 'comment', and 'data', respectively
-
-            Args:
-                logfmt (str): Format string for producing log output. Field 0
-                  is the `ipos` attribute, field 1 is the type code, and field
-                  2 is the `line` attribute
-
-            Returns:
-                (str): Formatted line with metadata
-        """
-        return logfmt.format(self.ipos, self.typecode, self._line)
 
 
 def fib(n):
@@ -450,134 +336,6 @@ def calculate_headloss(kwinput):
     return results
 
 
-# def process_ch2_case(ntok, token):
-#     """Generate results from tokenized data
-#
-#     Args:
-#       ntok (int): number of data tokens
-#       token ([str]): tokens parsed from data line.
-#         Contains at least one token
-#
-#     Returns:
-#       (dict): Calculation results and diagnostic info
-#     """
-#     mintok = 6
-#
-#     ikeys = (
-#         'volumetric flowrate', 'pipe inner diameter', 'pipe length',
-#         'kinematic viscosity', 'absolute pipe roughness',
-#         'gravitational acceleration', 'flow velocity', 'reynolds number'
-#     )
-#     okeys = (
-#         'darcy friction factor', 'head loss'
-#     )
-#
-#     results = {
-#         'status': 'undefined',
-#         'msg':    'No results generated yet',
-#         'units':  '',
-#         'input':  {},
-#         'output': {}
-#     }
-#
-#     for kk in ikeys:
-#         results['input'][kk] = float('NaN')
-#
-#     for kk in okeys:
-#         results['output'][kk] = float('NaN')
-#
-#     if ntok < mintok:
-#         results['status'] = 'error'
-#         results['msg'] = 'Too few tokens ({} found, {} expected)' \
-#                          .format(ntok, mintok)
-#         return results
-#
-#     if ntok > mintok:
-#         results['status'] = 'warning'
-#         results['msg'] = 'Too many tokens ({} found, {} expected)' \
-#                          .format(ntok, mintok)
-#     else:
-#         results['status'] = 'ok'
-#         results['msg'] = 'Proper token count ({})'.format(mintok)
-#
-#     try:
-#         # D   - Pipe diameter, ft
-#         idiameter = float(token[0])
-#         # Q   - Flow rate, cfs
-#         vol_flowrate = float(token[1])
-#         # FL  - Length of pipe, ft
-#         length = float(token[2])
-#         # VIS - Kinematic viscosity of fluid (nu)
-#         kin_visc = float(token[3])
-#         # E   - Absolute roughness of pipe, ft
-#         froughness = float(token[4])
-#         # G   - Acceleration of gravity, ft/s**2
-#         agrav = float(token[5])
-#     except ValueError as err:
-#         _logger.error("Numeric parse failure: {0:s}".format(str(err)))
-#         results['status'] = 'error'
-#         results['msg'] = 'Cannot parse values from input line'
-#         return results
-#
-#     if abs(agrav - sc.g) / sc.g < 0.1:
-#         _logger.info("Assuming SI units")
-#         results['units'] = 'SI'
-#     else:
-#         _logger.info("Assuming traditional units (US/English)")
-#         results['units'] = 'traditional'
-#         idiameter *= sc.foot
-#         vol_flowrate *= sc.foot**3
-#         length *= sc.foot
-#         kin_visc *= sc.foot**2
-#         froughness *= sc.foot
-#         agrav *= sc.foot
-#
-#     _logger.debug('idiameter = {0:0.4E} m'.format(idiameter))
-#     _logger.debug('vol_flowrate = {0:0.4E} m3/s'.format(vol_flowrate))
-#     _logger.debug('length = {0:0.4E} m'.format(length))
-#     _logger.debug('kin_visc = {0:0.4E} m2/s'.format(kin_visc))
-#     _logger.debug('froughness = {0:0.4E} m'.format(froughness))
-#     _logger.debug('agrav = {0:0.4E} m/s2'.format(agrav))
-#
-#     twall = 0.1 * idiameter
-#     try:
-#         pipe = Pipe(label='Example pipe', length=length, idiameter=idiameter,
-#                     twall=twall, froughness=froughness)
-#     except ValueError as err:
-#         results['status'] = 'error'
-#         results['msg'] = 'Cannot model pipe: {0:s}'.format(str(err))
-#         return results
-#
-#     # Calculate results
-#     vflow = vol_flowrate / pipe.flow_area
-#     Re = vflow * pipe.idiameter / kin_visc
-#     friction = friction_factor(Re, eD=pipe.eroughness)
-#     head_loss = friction * pipe.length * vflow**2 \
-#         / (2.0 * agrav * pipe.idiameter)
-#
-#     # Package results
-#     results['input']['volumetric flowrate'] = vol_flowrate
-#     results['input']['pipe inner diameter'] = pipe.idiameter
-#     results['input']['pipe length'] = pipe.length
-#     results['input']['kinematic viscosity'] = kin_visc
-#     results['input']['absolute pipe roughness'] = froughness
-#     results['input']['gravitational acceleration'] = agrav
-#     results['input']['flow velocity'] = vflow
-#     results['input']['reynolds number'] = Re
-#     results['output']['darcy friction factor'] = friction
-#     results['output']['head loss'] = head_loss
-#
-#     for kk in ikeys:
-#         _logger.debug('{0:s} = {1:0.4E}'
-#                       .format(kk, results['input'][kk]))
-#
-#     for kk in okeys:
-#         _logger.debug('{0:s} = {1:0.4E}'
-#                       .format(kk, results['output'][kk]))
-#
-#     return results
-
-
 def main(args):
     """Main entry point allowing external calls
 
@@ -595,13 +353,6 @@ def main(args):
 
         for ict, rawline in enumerate(fh):
             iline = InputLine(line=rawline, ipos=ict+1)
-#            line = rawline.rstrip('\r\n')
-#            ltype, ntok, token = categorize_line(line)
-#
-#            lcode = ltype[0].upper()
-#            msg = '{0:-6d} [{1:s}] {2:s}' \
-#                  .format(ict+1, ltype[0].upper(), line)
-#            _logger.debug(msg)
             _logger.debug(iline.as_log())
 
             if iline.typecode == 'D':
