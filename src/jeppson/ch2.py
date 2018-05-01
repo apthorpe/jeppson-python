@@ -23,6 +23,7 @@ import sys
 import scipy.constants as sc
 from fluids.friction import friction_factor
 
+from . import _logger, ureg, Q_
 from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
@@ -31,23 +32,7 @@ __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
-_logger = logging.getLogger(__name__)
-
-
-def fib(n):
-    """Fibonacci example function
-
-    Args:
-      n (int): integer
-
-    Returns:
-      int: n-th Fibonacci number
-    """
-    assert n > 0
-    a, b = 1, 1
-    for i in range(n-1):
-        a, b = b, a+b
-    return a
+# _logger = logging.getLogger(__name__)
 
 
 def parse_args(args):
@@ -118,24 +103,6 @@ def extract_case_input(iline, force_units=None):
     FlowInput = namedtuple('FlowInput', ['tag', 'description',
                                          'siunits', 'tunits', 'T2SI_conv'])
 
-#     ikeys = (
-#         'pipe inner diameter',
-#         'volumetric flowrate',
-#         'pipe length',
-#         'kinematic viscosity',
-#         'absolute pipe roughness',
-#         'gravitational acceleration'
-#     )
-#
-#     unitconv = (
-#         sc.foot,
-#         sc.foot**3,
-#         sc.foot,
-#         sc.foot**2,
-#         sc.foot,
-#         sc.foot
-#     )
-
     idataprop = OrderedDict([
         ('idiameter',  FlowInput('idiameter',  'pipe inner diameter',
                                  'm',    'ft',    sc.foot)),
@@ -179,7 +146,6 @@ def extract_case_input(iline, force_units=None):
         results['msg'] = 'Proper token count ({})'.format(mintok)
 
     # Convert tokens to floats; check for parsing errors
-#    for i, desc in enumerate(ikeys):
     for i, kk in enumerate(idataprop.keys()):
         desc = idataprop[kk].description
         try:
@@ -227,15 +193,13 @@ def extract_case_input(iline, force_units=None):
 
     # Convert units
     if results['units'] == 'Traditional':
-#        for i, fconv in enumerate(unitconv):
-#            results['input'][ikeys[i]] *= fconv
         for kk in idataprop:
             desc = idataprop[kk].description
             results['input'][desc] *= idataprop[kk].T2SI_conv
 
     for i, kk in enumerate(idataprop.keys()):
         desc = idataprop[kk].description
-        _logger.debug('{0:s} = {1:0.4E} {2:s}'
+        _logger.debug('  {0:s} = {1:0.4E} {2:s}'
                       .format(desc, results['input'][desc],
                               idataprop[kk].siunits))
 
@@ -253,19 +217,19 @@ def calculate_headloss(vol_flow, flow_area, lpipe, idiameter, eroughness,
        values are returned in a named tuple with key names ``head_loss``,
        ``friction``, ``vflow``, and ``Re`` respectively.
 
-        Args:
-            vol_flow (float): Z, in cubic meters per second
-            flow_area (float): Z, in square meters
-            lpipe (float): Z, in meters
-            idiameter (float): Z, in meters
-            eroughness (float): Z, dimensionless
-            kin_visc (float): Z, in square meters per second
-            grav (float): Z, in meters per second squared
+    Args:
+        vol_flow (float): Z, in cubic meters per second
+        flow_area (float): Z, in square meters
+        lpipe (float): Z, in meters
+        idiameter (float): Z, in meters
+        eroughness (float): Z, dimensionless
+        kin_visc (float): Z, in square meters per second
+        grav (float): Z, in meters per second squared
 
-        Returns:
-            (namedtuple): Results and intermediate quantities
+    Returns:
+        (namedtuple): Results and intermediate quantities
 
-            """
+    """
     HeadLoss = namedtuple('HeadLoss', ['head_loss', 'friction', 'vflow', 'Re'])
 
     flow_vel = vol_flow / flow_area
@@ -283,19 +247,19 @@ def generate_results(kwinput):
     input. Intermediate and final results will be returned with metadata
 
     Args:
-      kwinput (dict): A dict with the following keys with values in SI units:
-        ``volumetric flowrate``, ``pipe inner diameter``, ``pipe length``,
-        ``kinematic viscosity``, ``absolute pipe roughness``,
-        and ``gravitational acceleration``
+        kwinput (dict): A dict with the following keys with values in SI units:
+          ``volumetric flowrate``, ``pipe inner diameter``, ``pipe length``,
+          ``kinematic viscosity``, ``absolute pipe roughness``,
+          and ``gravitational acceleration``
 
     Returns:
-      (dict): Calculation results in SI units and diagnostic info
+        (dict): Calculation results in SI units and diagnostic info
     """
     dfmt = '  {0:s} = {1:0.4E}'
 
     ikeys = (
-        'volumetric flowrate',
         'pipe inner diameter',
+        'volumetric flowrate',
         'pipe length',
         'kinematic viscosity',
         'absolute pipe roughness',
@@ -402,17 +366,60 @@ def generate_results(kwinput):
     return results
 
 
+def generate_legacy_output(idata, odata, units):
+    """Return a head loss, friction factor, and initial conditions in the
+    format of the original Jeppson code
+
+    Args:
+        idata (dict): Input to head loss calculations
+        odata (dict): Results of head loss calculations
+        units (str): Display units for reporting results - either 'SI'
+          or 'Traditional'
+
+    Returns:
+        (str): FORTRAN-formatted head loss results
+    """
+    T2SI_conv = {
+        'volumetric flowrate': sc.foot**3,
+        'pipe inner diameter': sc.foot,
+        'pipe length': sc.foot,
+        'darcy friction factor': 1.0,
+        'head loss': sc.foot
+    }
+
+    ofmt = 'Q={0:10.4f}D={1:10.4f}L={2:10.2f}F={3:10.5f}HEADLOSS={4:10.4f}'
+
+    outstr = ''
+
+    if units == 'SI':
+        _logger.debug('Display units are SI')
+        outstr = ofmt.format(
+            idata['volumetric flowrate'],
+            idata['pipe inner diameter'],
+            idata['pipe length'],
+            odata['darcy friction factor'],
+            odata['head loss'])
+    else:
+        _logger.debug('Display units are Traditional')
+        outstr = ofmt.format(
+            idata['volumetric flowrate'] / T2SI_conv['volumetric flowrate'],
+            idata['pipe inner diameter'] / T2SI_conv['pipe inner diameter'],
+            idata['pipe length'] / T2SI_conv['pipe length'],
+            odata['darcy friction factor'],
+            odata['head loss'] / T2SI_conv['head loss'])
+
+    return outstr
+
+
 def main(args):
     """Main entry point allowing external calls
 
     Args:
-      args ([str]): command line parameter list
+        args ([str]): command line parameter list
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.info("Starting jeppson_ch2")
-
-    ofmt = 'Q={0:10.4f}D={1:10.4f}L={2:10.2f}F={3:10.5f}HEADLOSS={4:10.4f}'
 
     for fh in args.file:
         msg = 'Processing file: {0:s}'.format(fh.name)
@@ -429,6 +436,7 @@ def main(args):
                 indat = extract_case_input(iline)
                 results = generate_results(indat['input'])
 
+                # Log calcularion status;
                 if results['status'] == 'ok':
                     _logger.debug('Case processed successfully')
                 elif results['status'] == 'warning':
@@ -442,26 +450,18 @@ def main(args):
                                   '"{0:s}", {1:s}'
                                   .format(results['status'], results['msg']))
 
-# Finally, print results as original code
+                # Finally, print results as original code; infer output units
+                # from input units
                 if results['status'] in ('ok', 'warning'):
-                    if indat['units'] == 'SI':
-                        _logger.debug('Display units are SI')
-                        print(ofmt.format(
-                            results['input']['volumetric flowrate'],
-                            results['input']['pipe inner diameter'],
-                            results['input']['pipe length'],
-                            results['output']['darcy friction factor'],
-                            results['output']['head loss']))
-                    else:
-                        _logger.debug('Display units are Traditional')
-                        print(ofmt.format(
-                            results['input']['volumetric flowrate']
-                            / sc.foot**3,
-                            results['input']['pipe inner diameter'] / sc.foot,
-                            results['input']['pipe length'] / sc.foot,
-                            results['output']['darcy friction factor'],
-                            results['output']['head loss'] / sc.foot))
+                    ostr = generate_legacy_output(results['input'],
+                                                  results['output'],
+                                                  indat['units'])
+                    print(ostr)
                 else:
+                    # Differs from original code; broken input would crash and
+                    # all input was provided via STDIN. Here multiple files may
+                    # be procssed, each potentially containing multiple cases.
+                    # Report errors with line and source file name
                     print('! Case defined on line {0:d} of {1:s} failed'
                           .format(ict, fh.name))
 
