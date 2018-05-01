@@ -23,7 +23,7 @@ import sys
 import scipy.constants as sc
 from fluids.friction import friction_factor
 
-from . import _logger, ureg, Q_
+from . import _logger, ureg
 from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
@@ -31,8 +31,6 @@ from jeppson import __version__
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
-
-# _logger = logging.getLogger(__name__)
 
 
 def parse_args(args):
@@ -105,17 +103,17 @@ def extract_case_input(iline, force_units=None):
 
     idataprop = OrderedDict([
         ('idiameter',  FlowInput('idiameter',  'pipe inner diameter',
-                                 'm',    'ft',    sc.foot)),
+                                 'm',      'ft',      sc.foot)),
         ('vol_flow',   FlowInput('vol_flow',   'volumetric flowrate',
-                                 'm/s',  'ft/s',  sc.foot**3)),
+                                 'm/s',    'ft/s',    sc.foot**3)),
         ('lpipe',      FlowInput('lpipe',      'pipe length',
-                                 'm',    'ft',    sc.foot)),
+                                 'm',      'ft',      sc.foot)),
         ('kin_visc',   FlowInput('kin_visc',   'kinematic viscosity',
-                                 'm2/s', 'ft/s2', sc.foot**2)),
+                                 'm**2/s', 'ft/s**2', sc.foot**2)),
         ('eroughness', FlowInput('eroughness', 'absolute pipe roughness',
-                                 '-',    '-',     sc.foot)),
+                                 'dimensionless', 'dimensionless', sc.foot)),
         ('grav',       FlowInput('grav',       'gravitational acceleration',
-                                 'm/s2', 'ft/s2', sc.foot))
+                                 'm/s**2', 'ft/s**2', sc.foot))
     ])
 
     # Set default results
@@ -123,7 +121,8 @@ def extract_case_input(iline, force_units=None):
         'status': 'undefined',
         'msg':    'No results generated yet',
         'units':  '',
-        'input':  {}
+        'input':  {},
+        'uinput':  {}
     }
 
     for kk in idataprop:
@@ -191,12 +190,28 @@ def extract_case_input(iline, force_units=None):
                 results['msg'] = msg
             # pass through; use inferred units
 
+    # Set units (Pint)
+    for kk in idataprop:
+        desc = idataprop[kk].description
+        if results['units'] == 'SI':
+            unitizer = ureg.parse_expression(idataprop[kk].siunits)
+        else:
+            unitizer = ureg.parse_expression(idataprop[kk].tunits)
+        results['uinput'][desc] = results['input'][desc] * unitizer
+
+    _logger.debug('As Pint quantities:')
+    for i, kk in enumerate(idataprop.keys()):
+        desc = idataprop[kk].description
+        _logger.debug('  {0:s} = {1:0.4E~P}'
+                      .format(desc, results['uinput'][desc]))
+
     # Convert units
     if results['units'] == 'Traditional':
         for kk in idataprop:
             desc = idataprop[kk].description
             results['input'][desc] *= idataprop[kk].T2SI_conv
 
+    _logger.debug('As quantities with separately-maintained units:')
     for i, kk in enumerate(idataprop.keys()):
         desc = idataprop[kk].description
         _logger.debug('  {0:s} = {1:0.4E} {2:s}'
@@ -316,6 +331,8 @@ def generate_results(kwinput):
     ddata = results['derived']
     odata = results['output']
 
+#    iudata = results['uinput']
+
     # Arbitrary wall thickness to ensure complete pipe object definition
     twall = 0.1 * idata['pipe inner diameter']
     try:
@@ -338,6 +355,24 @@ def generate_results(kwinput):
                                eroughness=ddata['relative pipe roughness'],
                                kin_visc=idata['kinematic viscosity'],
                                grav=idata['gravitational acceleration'])
+
+#     # Wrap calculate_headloss with units on input and output vectors
+#     calculate_headloss_u = ureg.wraps(
+#         (ureg.parse_expression('m*3/s'), ureg.meter**2, ureg.meter,
+#             ureg.meter, ureg.dimensionless, ureg.parse_expression('m**2/s'),
+#             ureg.parse_expression('m/s**2')),
+#         (ureg.meter, ureg.dimensionless, ureg.meter / ureg.second,
+#             ureg.dimensionless))(calculate_headloss)
+#
+#     hludat = calculate_headloss_u(
+#         vol_flow=iudata['volumetric flowrate'],
+#         flow_area=sc.pi / 4.0 * iudata['pipe inner diameter']**2
+#         lpipe=iudata['pipe length'],
+#         idiameter=iudata['pipe inner diameter'],
+#         eroughness=iudata['absolute pipe roughness']
+#                   / iudata['pipe inner diameter']
+#         kin_visc=iudata['kinematic viscosity'],
+#         grav=iudata['gravitational acceleration'])
 
     results['status'] = 'ok'
     results['msg'] = 'Calculation complete'
