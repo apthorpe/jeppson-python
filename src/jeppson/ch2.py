@@ -270,7 +270,9 @@ def generate_results(kwinput):
     Returns:
         (dict): Calculation results in SI units and diagnostic info
     """
+#        kwuinput (dict): As kwinput but values as pint Quantity objects
     dfmt = '  {0:s} = {1:0.4E}'
+#    dufmt = '  {0:s} = {1:0.4E~P}'
 
     ikeys = (
         'pipe inner diameter',
@@ -300,6 +302,9 @@ def generate_results(kwinput):
         'derived': {},
         'output':  {}
     }
+#        'uinput':   {},
+#        'uderived': {},
+#        'uoutput':  {},
 
 #    _logger.debug('Input object echo')
 #     for kk in kwinput:
@@ -323,6 +328,17 @@ def generate_results(kwinput):
                 results['msg'] = 'Required input "{0:s}" not specified' \
                     .format(kk)
 
+#         if kk in kwuinput:
+#             results['uinput'][kk] = kwuinput[kk]
+#             _logger.debug(dufmt.format(kk, results['uinput'][kk]))
+#         else:
+#             _logger.debug('Cannot find {0:s} in input'.format(kk))
+#             # Record the first error
+#             if results['status'] != 'error':
+#                 results['status'] = 'error'
+#                 results['msg'] = 'Required input "{0:s}" not specified' \
+#                     .format(kk)
+
     if results['status'] == 'error':
         return results
 
@@ -332,6 +348,8 @@ def generate_results(kwinput):
     odata = results['output']
 
 #    iudata = results['uinput']
+#    dudata = results['uderived']
+#    oudata = results['uoutput']
 
     # Arbitrary wall thickness to ensure complete pipe object definition
     twall = 0.1 * idata['pipe inner diameter']
@@ -356,32 +374,42 @@ def generate_results(kwinput):
                                kin_visc=idata['kinematic viscosity'],
                                grav=idata['gravitational acceleration'])
 
-#     # Wrap calculate_headloss with units on input and output vectors
-#     calculate_headloss_u = ureg.wraps(
-#         (ureg.parse_expression('m*3/s'), ureg.meter**2, ureg.meter,
-#             ureg.meter, ureg.dimensionless, ureg.parse_expression('m**2/s'),
-#             ureg.parse_expression('m/s**2')),
-#         (ureg.meter, ureg.dimensionless, ureg.meter / ureg.second,
-#             ureg.dimensionless))(calculate_headloss)
-#
-#     hludat = calculate_headloss_u(
-#         vol_flow=iudata['volumetric flowrate'],
-#         flow_area=sc.pi / 4.0 * iudata['pipe inner diameter']**2
-#         lpipe=iudata['pipe length'],
-#         idiameter=iudata['pipe inner diameter'],
-#         eroughness=iudata['absolute pipe roughness']
-#                   / iudata['pipe inner diameter']
-#         kin_visc=iudata['kinematic viscosity'],
-#         grav=iudata['gravitational acceleration'])
-
-    results['status'] = 'ok'
-    results['msg'] = 'Calculation complete'
-
     ddata['flow velocity'] = hldat.vflow
     ddata['reynolds number'] = hldat.Re
 
     odata['head loss'] = hldat.head_loss
     odata['darcy friction factor'] = hldat.friction
+
+# Repeat with Quantities
+
+#     dudata['flow area'] = pipe.flow_area * ureg.meter**2
+#     dudata['relative pipe roughness'] = pipe.eroughness * ureg.dimensionless
+#
+#     # Wrap calculate_headloss with units on input and output vectors
+#     calculate_headloss_u = ureg.wraps(
+#         (ureg.parse_expression('m*3/s'), ureg.meter**2, ureg.meter,
+#             ureg.meter, ureg.dimensionless, ureg.parse_expression('m**2/s'),
+#             ureg.parse_expression('m/s**2')),
+#         (ureg.meter, ureg.dimensionless, ureg.parse_expression('m/s'),
+#             ureg.dimensionless))(calculate_headloss)
+#
+#     hludat = calculate_headloss_u(
+#         vol_flow=iudata['volumetric flowrate'],
+#         flow_area=dudata['flow area'],
+#         lpipe=iudata['pipe length'],
+#         idiameter=iudata['pipe inner diameter'],
+#         eroughness=dudata['relative pipe roughness'],
+#         kin_visc=iudata['kinematic viscosity'],
+#         grav=iudata['gravitational acceleration'])
+#
+#     dudata['flow velocity'] = hludat.vflow
+#     dudata['reynolds number'] = hludat.Re
+#
+#     oudata['head loss'] = hludat.head_loss
+#     oudata['darcy friction factor'] = hludat.friction
+
+    results['status'] = 'ok'
+    results['msg'] = 'Calculation complete'
 
     # Diagnostics/audit trail
     _logger.debug('Input values:')
@@ -470,6 +498,7 @@ def main(args):
 
                 indat = extract_case_input(iline)
                 results = generate_results(indat['input'])
+#                results = generate_results(indat['input'], indat['uinput'])
 
                 # Log calcularion status;
                 if results['status'] == 'ok':
