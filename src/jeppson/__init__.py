@@ -21,7 +21,8 @@ except ImportError:
 _logger = logging.getLogger(__name__)
 _logger.addHandler(NullHandler())
 
-# Pint unit registry
+# Pint unit registry; 'mks' used as default (base) unit system.
 # Share with all functions in an application  via 'from . import ureg, Q_
-ureg = UnitRegistry()
+ureg = UnitRegistry(system='mks')
+# Alias for Quantity constructor.
 Q_ = ureg.Quantity
