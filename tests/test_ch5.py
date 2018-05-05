@@ -2,16 +2,22 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from jeppson.ch5 import fib
+import jeppson.ch5 as jch5
 
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
 
-def test_fib():
-    assert fib(1) == 1
-    assert fib(2) == 1
-    assert fib(7) == 13
-    with pytest.raises(AssertionError):
-        fib(-10)
+# def test_fib():
+#     assert fib(1) == 1
+#     assert fib(2) == 1
+#     assert fib(7) == 13
+#     with pytest.raises(AssertionError):
+#         fib(-10)
+
+
+# extract_case_input(iline, force_units=None):
+# calculate_headloss(vol_flow, flow_area, lpipe, idiameter, eroughness,
+# generate_results(kwinput):
+# generate_legacy_output(idata, odata, units):
