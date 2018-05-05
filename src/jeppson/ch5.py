@@ -194,6 +194,143 @@ def extract_case_parameters(deck, iptr):
             npipes, njunctions, nloops, maxiter,
             unitcode, errlimit, kinvisc, fvol_flow)
 
+        _logger.debug('Successfully read case parameters')
+        _logger.debug('  npipes = {0:d}'
+                      .format(results['case_parameters'].npipes))
+        _logger.debug('  njunctions = {0:d}'
+                      .format(results['case_parameters'].njunctions))
+        _logger.debug('  nloops = {0:d}'
+                      .format(results['case_parameters'].nloops))
+        _logger.debug('  maxiter = {0:d}'
+                      .format(results['case_parameters'].maxiter))
+        _logger.debug('  unitcode = {0:d}'
+                      .format(results['case_parameters'].unitcode))
+        _logger.debug('  errlimit = {0:0.4E}'
+                      .format(results['case_parameters'].errlimit))
+        _logger.debug('  kin_visc = {0:0.4E~}'
+                      .format(results['case_parameters'].kin_visc))
+        _logger.debug('  fvol_flow = {0:0.4f}'
+                      .format(results['case_parameters'].fvol_flow))
+
+    return results
+
+
+def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
+    """Extract pipe definitions
+
+    Args:
+        deck [(InputLine)]: List of InputLine objects; user input lines
+        iptr (int): Starting pointer for reading case parameters
+        npipes (int): Number of pipes expected in model
+        npipecards (int): Number of input lines needed to define a single
+          characteristic of all pipes.
+        unitcode (int): Code from input file selecting pipe dimension units
+
+    Returns:
+        (dict): Pipe dimensions and metadata
+    """
+
+    inputconv = [
+        {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
+        {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
+        {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
+        {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
+    ]
+    inunit = inputconv[unitcode]
+
+    tmppipe = {
+        'idiameter': [],
+        'lpipe': [],
+        'froughness': []
+    }
+
+    results = {
+        'status': 'unknown',
+        'msg': 'Pipe info results not initialized',
+        'iread': 3 * npipecards,
+        'pipe_info': []
+    }
+
+    for ict in range(npipecards):
+        idiamctr = iptr + ict
+        ilpipectr = idiamctr + npipecards
+        ifroughctr = idiamctr + 2 * npipecards
+        for tok in deck[idiamctr].token:
+            tmppipe['idiameter'].append(Q_(float(tok), inunit['idiameter']))
+        for tok in deck[ilpipectr].token:
+            tmppipe['lpipe'].append(Q_(float(tok), inunit['lpipe']))
+        for tok in deck[ifroughctr].token:
+            tmppipe['froughness'].append(Q_(float(tok), inunit['froughness']))
+
+    _logger.debug('Pipe set {0:d} elements:'.format(npipes))
+    for ict in range(npipes):
+        results['pipe_info'].append({'idiameter': tmppipe['idiameter'][ict],
+                                     'lpipe': tmppipe['lpipe'][ict],
+                                     'froughness': tmppipe['froughness'][ict]})
+        curpipe = results['pipe_info'][ict]
+        _logger.debug('D= {0:16.4E~} L={1:9.1f~} e={2:16.4E~}'
+                      .format(curpipe['idiameter'],
+                              curpipe['lpipe'],
+                              curpipe['froughness']))
+    results['status'] = 'ok'
+    results['message'] = 'Read diameter, length and roughness ' \
+                         'for {:d} pipes'.format(npipes)
+
+    return results
+
+
+def extract_junctions(deck, iptr, njunctions):
+    """Extract junction information from user input
+    
+    Args:
+        deck [(InputLine)]: List of parsed lines of user input 
+        iptr (int): Pointer to first line of junction input
+
+    Returns:
+        (dict): Junction info and metadata
+    """
+    results = {
+        'status': 'unknown',
+        'msg': 'Junction info results not initialized',
+        'iread': 0,
+        'junc_info': []
+    }
+
+    inputconv = [
+        'skip',
+        'gallon / minute',
+        'ft**3 / sec',
+        'm**3 / sec'
+    ]
+
+    jptr = iptr
+    iread = 0
+    ictr = 0
+    while ictr < njunctions:
+        ictr += 1
+        iread += 1
+        inflow_units = int(deck[jptr].token[0])
+        njpipes = int(deck[jptr].token[1])
+        for itok in range(njpipes):
+            _logger.debug('Pipe {0:d} is {1:d}'
+                          .format(itok+1, int(deck[jptr].token[itok+2])))
+
+        if inflow_units < 1:
+            _logger.debug('No inflow')
+        elif inflow_units < 4:
+            jptr += 1
+            iread += 1
+            qinflow = Q_(float(deck[jptr].token[0]), inputconv[inflow_units])
+            _logger.debug('Inflow of {0:0.4E~}'.format(qinflow))
+        else:
+            _logger.error('Junction inflow unit specifier out of range')
+
+        jptr += 1
+
+#        assert deck[jptr].ntok - b == 2
+    _logger.debug('Read {0:d} junctions over {1:d} input lines.'
+                  .format(ictr, iread))
+
     return results
 
 
@@ -221,6 +358,7 @@ def main(args):
                 deck.append(iline)
 
 # Step 1. Extract case parameters
+        _logger.debug('1. Extracting case parameters')
         iptr = 0
         case_info = extract_case_parameters(deck, iptr)
         if case_info['status'] == 'error':
@@ -229,13 +367,36 @@ def main(args):
             _logger.info('Skipping remainder of {0:s}'.format(fh.file))
             continue
 
+        _logger.debug('1. Extracting case parameters')
         iptr += case_info['iread']
 
+        npipes = case_info['case_parameters'].npipes
+        npipecards = 1
+        pipect = deck[iptr].ntok
+        while pipect < npipes:
+            npipecards += 1
+            pipect += deck[iptr+npipecards-1].ntok
+
+        _logger.debug('Found {0:d} of {1:d} pipes defined in {2:d} lines'
+                      .format(pipect, npipes, npipecards))
 # Step 2. Read pipe data
-#        pipe = extract_pipe_definitions(deck, iptr)
-#        iptr += len(pipe)
+        _logger.debug('2. Reading pipe data')
+        unitcode = case_info['case_parameters'].unitcode
+        pipe_info = extract_pipe_definitions(deck, iptr, npipes, npipecards,
+                                             unitcode)
+
+        if pipe_info['status'] == 'error':
+            _logger.error('Error reading pipe definitions: {0:s}'
+                          .format(pipe_info['msg']))
+            _logger.info('Skipping remainder of {0:s}'.format(fh.file))
+            continue
+
+        iptr += pipe_info['iread']
+
 # Step 3. Read junction data
-#        pipemap, iread = extract_junctions(deck, iptr, pipe)
+        njunctions = case_info['case_parameters'].njunctions
+        pipemap_info = extract_junctions(deck, iptr, njunctions)
+
 #        iptr += iread
 # Step 4. Read loop data
 #        pipeloop, iread = extract_loops(deck, iptr, pipe)
