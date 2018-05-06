@@ -16,7 +16,7 @@ from __future__ import division, print_function, absolute_import
 import argparse
 from collections import namedtuple, OrderedDict
 import logging
-# from math import isnan, log
+from math import copysign
 import sys
 
 # import iapws
@@ -262,14 +262,15 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         for tok in deck[ifroughctr].token:
             tmppipe['froughness'].append(Q_(float(tok), inunit['froughness']))
 
-    _logger.debug('Pipe set {0:d} elements:'.format(npipes))
+    _logger.debug('Model contains {0:d} pipes:'.format(npipes))
     for ict in range(npipes):
         results['pipe_info'].append({'idiameter': tmppipe['idiameter'][ict],
                                      'lpipe': tmppipe['lpipe'][ict],
                                      'froughness': tmppipe['froughness'][ict]})
         curpipe = results['pipe_info'][ict]
-        _logger.debug('D= {0:16.4E~} L={1:9.1f~} e={2:16.4E~}'
-                      .format(curpipe['idiameter'],
+        _logger.debug('  id={0:d}  D= {1:16.4E~} L={2:9.1f~} e={3:16.4E~}'
+                      .format(ict,
+                              curpipe['idiameter'],
                               curpipe['lpipe'],
                               curpipe['froughness']))
     results['status'] = 'ok'
@@ -281,19 +282,24 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
 
 def extract_junctions(deck, iptr, njunctions):
     """Extract junction information from user input
-    
+
     Args:
-        deck [(InputLine)]: List of parsed lines of user input 
+        deck [(InputLine)]: List of parsed lines of user input
         iptr (int): Pointer to first line of junction input
+        njunctions (int): Number of junctions expected in model
 
     Returns:
         (dict): Junction info and metadata
     """
+#    PipeRoute = namedtuple('PipeRoute', ['pipe_id', 'from', 'to', 'inflow'])
     results = {
         'status': 'unknown',
         'msg': 'Junction info results not initialized',
         'iread': 0,
-        'junc_info': []
+        'junc_info': {
+            'inflows': {},
+            'pipe_map': {},
+        }
     }
 
     inputconv = [
@@ -303,33 +309,157 @@ def extract_junctions(deck, iptr, njunctions):
         'm**3 / sec'
     ]
 
+    ji = results['junc_info']
+
     jptr = iptr
     iread = 0
     ictr = 0
     while ictr < njunctions:
         ictr += 1
+        junc_id = ictr - 1
         iread += 1
         inflow_units = int(deck[jptr].token[0])
         njpipes = int(deck[jptr].token[1])
+        _logger.debug('Processing: {0:s}'.format(deck[jptr].as_log()))
         for itok in range(njpipes):
-            _logger.debug('Pipe {0:d} is {1:d}'
-                          .format(itok+1, int(deck[jptr].token[itok+2])))
+            pipe_id = int(deck[jptr].token[itok+2])
+            pipe_in = pipe_id > 0
+            pipe_read_id = abs(pipe_id)
+            pipe_stored_id = pipe_read_id - 1
+            if pipe_stored_id not in ji['pipe_map']:
+                ji['pipe_map'][pipe_stored_id] = {'id': pipe_stored_id}
 
+            if pipe_read_id == 0:
+                results['status'] = 'error'
+                results['msg'] = 'Junction {0:d} member {1:d} has pipe id ' \
+                                 'out of range: (0):'.format(junc_id, itok+1)
+                _logger.error(results['msg'])
+            else:
+                # Set to zero-index
+                _logger.debug('Note: Pipe id adjusted from {0:d} to {1:d} due '
+                              'to zero-indexing'.format(pipe_read_id,
+                                                        pipe_stored_id))
+                if pipe_in:
+                    pipe_dir = 'inflow'
+                    ji['pipe_map'][pipe_stored_id]['to'] = junc_id
+                else:
+                    pipe_dir = 'outflow'
+                    ji['pipe_map'][pipe_stored_id]['from'] = junc_id
+                _logger.debug('Junction {0:d} member {1:d} is pipe {2:d}, '
+                              '{3:s}'.format(junc_id, itok+1, pipe_stored_id,
+                                             pipe_dir))
+
+        qinflow = Q_(0.0, 'm**3 / sec')
         if inflow_units < 1:
             _logger.debug('No inflow')
         elif inflow_units < 4:
             jptr += 1
             iread += 1
+            _logger.debug('Processing inflow: {0:s}'
+                          .format(deck[jptr].as_log()))
             qinflow = Q_(float(deck[jptr].token[0]), inputconv[inflow_units])
             _logger.debug('Inflow of {0:0.4E~}'.format(qinflow))
         else:
             _logger.error('Junction inflow unit specifier out of range')
+            results['status'] = 'error'
+            results['msg'] = 'Pipe {0:d} junction inflow unit specifier ' \
+                             'out of range'.format(ictr)
+        ji['inflows'][junc_id] = qinflow
 
         jptr += 1
 
-#        assert deck[jptr].ntok - b == 2
-    _logger.debug('Read {0:d} junctions over {1:d} input lines.'
-                  .format(ictr, iread))
+    _logger.debug('jptr-iptr={0:d} vs iread={1:d}'.format(jptr-iptr, iread))
+    _logger.debug('next line to read is #{0:d}: {1:s}'
+                  .format(jptr, deck[jptr].as_log()))
+
+    results['iread'] = iread
+    if results['status'] == 'unknown':
+        results['status'] = 'ok'
+        results['msg'] = 'Read {0:d} junctions over {1:d} input lines.' \
+                         .format(ictr, iread)
+
+    _logger.debug(results['status'] + ': ' + results['msg'])
+
+    _logger.debug('Pipe network topology:')
+    for idx in sorted(ji['pipe_map'].keys()):
+        _logger.debug('  Pipe {0:d} connects junction {1:d} to junction {2:d}'
+                      .format(ji['pipe_map'][idx]['id'],
+                              ji['pipe_map'][idx]['from'],
+                              ji['pipe_map'][idx]['to']))
+
+    _logger.debug('Junction inflows:')
+    for idx in sorted(ji['inflows'].keys()):
+        _logger.debug('  Inflow to junction {0:d} is {1:0.4E~}'
+                      .format(idx, ji['inflows'][idx]))
+
+    return results
+
+
+def extract_loops(deck, iptr, nloops):
+    """Extract pipe loop data for continuity
+    Args:
+        deck [(InputLine)]: List of parsed lines of user input
+        iptr (int): Pointer to first line of loop input
+        nloops (int): Number of loops expected in case
+
+    Returns:
+        (dict): Pipe loop info and metadata
+    """
+
+    results = {
+        'status': 'unknown',
+        'msg': 'Pipe loop results not initialized',
+        'iread': 0,
+        'loop_info': {}
+    }
+    LoopElement = namedtuple("LoopElement", ['pipe_id', 'flow_dir'])
+
+    iloop = 0
+    iread = 0
+    jptr = iptr
+    while iread < nloops:
+        _logger.debug('Processing {0:s}'.format(deck[jptr].as_log()))
+        nlooppipe = int(deck[jptr].token[0])
+        assert nlooppipe == deck[jptr].ntok - 1
+        results['loop_info'][iloop] = []
+        for ipos in range(nlooppipe):
+            pipe_read_id = int(deck[jptr].token[1+ipos])
+            flow_conv = copysign(1.0, pipe_read_id)
+            pipe_read_id = abs(pipe_read_id)
+            pipe_stored_id = pipe_read_id - 1
+            looppart = LoopElement(pipe_stored_id, flow_conv)
+            results['loop_info'][iloop].append(looppart)
+            if pipe_read_id == 0:
+                results['status'] = 'error'
+                results['msg'] = 'Element {0:d} of loop {1:d} has an ' \
+                                 'invalid pipe id (0)'.format(ipos+1, iloop+1)
+
+        iread += 1
+        iloop += 1
+        jptr += 1
+
+    results['iread'] = iread
+    if results['status'] == 'unknown':
+        results['status'] = 'ok'
+        results['msg'] = '{0:d} loops have been read'.format(iloop)
+
+    _logger.debug(results['status'] + ': ' + results['msg'])
+
+    assert nloops == iloop
+
+    for idx in range(iloop):
+        nparts = len(results['loop_info'][idx])
+        _logger.debug('Loop {0:d} contains {1:d} elements:'
+                      .format(idx, nparts))
+        for jdx in range(nparts):
+            if results['loop_info'][idx][jdx].flow_dir > 0.0:
+                flow_dir = 'clockwise (forward)'
+            else:
+                flow_dir = 'counter-clockwise (reverse)'
+            _logger.debug('  Element {0:d} is pipe {1:d}, flow is {2:s}'
+                          .format(jdx+1,
+                                  results['loop_info'][idx][jdx].pipe_id,
+                                  flow_dir))
 
     return results
 
@@ -357,54 +487,80 @@ def main(args):
             if iline.typecode == 'D':
                 deck.append(iline)
 
-# Step 1. Extract case parameters
-        _logger.debug('1. Extracting case parameters')
         iptr = 0
-        case_info = extract_case_parameters(deck, iptr)
-        if case_info['status'] == 'error':
-            _logger.error('Error reading case parameters: {0:s}'
-                          .format(case_info['msg']))
-            _logger.info('Skipping remainder of {0:s}'.format(fh.file))
-            continue
+        while iptr < len(deck):
 
-        _logger.debug('1. Extracting case parameters')
-        iptr += case_info['iread']
+            # Step 1. Extract case parameters
+            _logger.debug('1. Extracting case parameters')
+            case_info = extract_case_parameters(deck, iptr)
+            if case_info['status'] == 'error':
+                _logger.error('Error reading case parameters: {0:s}'
+                              .format(case_info['msg']))
+                _logger.info('Skipping remainder of {0:s}'.format(fh.name))
+                break
 
-        npipes = case_info['case_parameters'].npipes
-        npipecards = 1
-        pipect = deck[iptr].ntok
-        while pipect < npipes:
-            npipecards += 1
-            pipect += deck[iptr+npipecards-1].ntok
+            iptr += case_info['iread']
 
-        _logger.debug('Found {0:d} of {1:d} pipes defined in {2:d} lines'
-                      .format(pipect, npipes, npipecards))
-# Step 2. Read pipe data
-        _logger.debug('2. Reading pipe data')
-        unitcode = case_info['case_parameters'].unitcode
-        pipe_info = extract_pipe_definitions(deck, iptr, npipes, npipecards,
-                                             unitcode)
+            npipes = case_info['case_parameters'].npipes
+            npipecards = 1
+            pipect = deck[iptr].ntok
+            while pipect < npipes:
+                npipecards += 1
+                pipect += deck[iptr+npipecards-1].ntok
 
-        if pipe_info['status'] == 'error':
-            _logger.error('Error reading pipe definitions: {0:s}'
-                          .format(pipe_info['msg']))
-            _logger.info('Skipping remainder of {0:s}'.format(fh.file))
-            continue
+            _logger.debug('Found {0:d} of {1:d} pipes defined in {2:d} lines'
+                          .format(pipect, npipes, npipecards))
+            # Step 2. Read pipe data
+            _logger.debug('2. Reading pipe data')
+            unitcode = case_info['case_parameters'].unitcode
+            pipe_info = extract_pipe_definitions(deck, iptr, npipes,
+                                                 npipecards, unitcode)
 
-        iptr += pipe_info['iread']
+            if pipe_info['status'] == 'error':
+                _logger.error('Error reading pipe definitions: {0:s}'
+                              .format(pipe_info['msg']))
+                _logger.info('Skipping remainder of {0:s}'.format(fh.name))
+                break
 
-# Step 3. Read junction data
-        njunctions = case_info['case_parameters'].njunctions
-        pipemap_info = extract_junctions(deck, iptr, njunctions)
+            iptr += pipe_info['iread']
 
-#        iptr += iread
-# Step 4. Read loop data
-#        pipeloop, iread = extract_loops(deck, iptr, pipe)
+            # Step 3. Read junction data
+            _logger.debug('3. Reading junction inflows and pipe network '
+                          'topology')
+            njunctions = case_info['case_parameters'].njunctions
+            pipemap_info = extract_junctions(deck, iptr, njunctions)
 
-# Done reading input; assert (iptr + iread - 1) == len(deck)
-# Step 5. Assemble matrix
-# Step 6. Solve matrix
-# Step 7. Display results
+            if pipemap_info['status'] == 'error':
+                _logger.error('Error reading junction data: {0:s}'
+                              .format(pipemap_info['msg']))
+                _logger.info('Skipping remainder of {0:s}'.format(fh.name))
+                break
+
+            iptr += pipemap_info['iread']
+
+            # Step 4. Read loop data
+            _logger.debug('4. Reading loop continuity data')
+            nloops = case_info['case_parameters'].nloops
+            pipeloop_info = extract_loops(deck, iptr, nloops)
+
+            if pipemap_info['status'] == 'error':
+                _logger.error('Error reading loop continuity data: {0:s}'
+                              .format(pipeloop_info['msg']))
+                _logger.info('Skipping remainder of {0:s}'.format(fh.name))
+                break
+
+            iptr += pipeloop_info['iread']
+            # Done reading input; assert (iptr + iread - 1) == len(deck) for a
+            # single case
+
+            # Step 5. Assemble matrix
+            _logger.debug('5. Assemble matrix')
+            # Step 6. Solve matrix
+            _logger.debug('6. Solve matrix')
+            # Step 7. Display results
+            _logger.debug('7. Display results')
+
+        _logger.info('Done processing {0:s}'.format(fh.name))
     _logger.info("Ending jeppson_ch5")
 
 
