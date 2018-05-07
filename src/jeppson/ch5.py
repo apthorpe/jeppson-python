@@ -22,6 +22,7 @@ import sys
 # import iapws
 # import scipy.constants as sc
 # from fluids.friction import friction_factor
+import numpy as np
 
 from . import _logger, ureg, Q_
 # from jeppson.pipe import Pipe
@@ -155,7 +156,7 @@ def extract_case_parameters(deck, iptr):
         (dict): Case parameters
     """
     tags = ('npipes', 'njunctions', 'nloops', 'maxiter', 'unitcode',
-            'errlimit', 'kin_visc', 'fvol_flow')
+            'tolerance', 'kin_visc', 'fvol_flow')
     mintok = len(tags)
     CaseParameters = namedtuple("CaseParameters", tags)
 
@@ -183,7 +184,7 @@ def extract_case_parameters(deck, iptr):
         nloops = int(cpline.token[2])
         maxiter = int(cpline.token[3])
         unitcode = int(cpline.token[4])
-        errlimit = float(cpline.token[5])
+        tolerance = float(cpline.token[5])
         if unitcode <= 1:
             kinvisc = Q_(float(cpline.token[6]), 'ft**2/s')
         else:
@@ -192,7 +193,7 @@ def extract_case_parameters(deck, iptr):
 
         results['case_parameters'] = CaseParameters(
             npipes, njunctions, nloops, maxiter,
-            unitcode, errlimit, kinvisc, fvol_flow)
+            unitcode, tolerance, kinvisc, fvol_flow)
 
         _logger.debug('Successfully read case parameters')
         _logger.debug('  npipes = {0:d}'
@@ -205,8 +206,8 @@ def extract_case_parameters(deck, iptr):
                       .format(results['case_parameters'].maxiter))
         _logger.debug('  unitcode = {0:d}'
                       .format(results['case_parameters'].unitcode))
-        _logger.debug('  errlimit = {0:0.4E}'
-                      .format(results['case_parameters'].errlimit))
+        _logger.debug('  tolerance = {0:0.4E}'
+                      .format(results['case_parameters'].tolerance))
         _logger.debug('  kin_visc = {0:0.4E~}'
                       .format(results['case_parameters'].kin_visc))
         _logger.debug('  fvol_flow = {0:0.4f}'
@@ -264,12 +265,13 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
 
     _logger.debug('Model contains {0:d} pipes:'.format(npipes))
     for ict in range(npipes):
-        results['pipe_info'].append({'idiameter': tmppipe['idiameter'][ict],
+        results['pipe_info'].append({'id': ict,
+                                     'idiameter': tmppipe['idiameter'][ict],
                                      'lpipe': tmppipe['lpipe'][ict],
                                      'froughness': tmppipe['froughness'][ict]})
         curpipe = results['pipe_info'][ict]
         _logger.debug('  id={0:d}  D= {1:16.4E~} L={2:9.1f~} e={3:16.4E~}'
-                      .format(ict,
+                      .format(curpipe['id'],
                               curpipe['idiameter'],
                               curpipe['lpipe'],
                               curpipe['froughness']))
@@ -478,6 +480,7 @@ def main(args):
         msg = 'Processing file: {0:s}'.format(fh.name)
         _logger.info(msg)
 
+        case_dom = {}
         deck = []
 
         for ict, rawline in enumerate(fh):
@@ -498,6 +501,8 @@ def main(args):
                               .format(case_info['msg']))
                 _logger.info('Skipping remainder of {0:s}'.format(fh.name))
                 break
+
+            case_dom['params'] = case_info['case_parameters']
 
             iptr += case_info['iread']
 
@@ -522,6 +527,8 @@ def main(args):
                 _logger.info('Skipping remainder of {0:s}'.format(fh.name))
                 break
 
+            case_dom['pipe'] = pipe_info['pipe_info']
+
             iptr += pipe_info['iread']
 
             # Step 3. Read junction data
@@ -536,6 +543,8 @@ def main(args):
                 _logger.info('Skipping remainder of {0:s}'.format(fh.name))
                 break
 
+            case_dom['junc'] = pipemap_info['junc_info']
+
             iptr += pipemap_info['iread']
 
             # Step 4. Read loop data
@@ -543,15 +552,207 @@ def main(args):
             nloops = case_info['case_parameters'].nloops
             pipeloop_info = extract_loops(deck, iptr, nloops)
 
-            if pipemap_info['status'] == 'error':
+            if pipeloop_info['status'] == 'error':
                 _logger.error('Error reading loop continuity data: {0:s}'
                               .format(pipeloop_info['msg']))
                 _logger.info('Skipping remainder of {0:s}'.format(fh.name))
                 break
 
+            case_dom['loop'] = pipeloop_info['loop_info']
+
             iptr += pipeloop_info['iread']
             # Done reading input; assert (iptr + iread - 1) == len(deck) for a
             # single case
+
+# #######################################################################
+#        ! Calculate loss coefficient KP based on length and diameter
+#        ! unit of measure
+
+            unitcode = case_dom['params'].unitcode
+            if unitcode in (0, 1):
+                # Coefficient for traditional (US) units
+                kpcoeff = 9.517E-4
+            elif unitcode in (2, 3):
+                # Coefficient for mks (SI) units
+                kpcoeff = 2.12E-3
+            else:
+                raise ValueError('Unknown unit code {0:d}, expected (0..3)'
+                                 .format(unitcode))
+
+            for currpipe in case_dom['pipe']:
+                ld = (currpipe['lpipe'].to_base_units()
+                      / currpipe['idiameter'].to_base_units()).magnitude
+                currpipe['kp'] = kpcoeff * ld ** 4.87
+                _logger.debug('Pipe {0:d} Kp = {1:0.4E}'
+                              .format(currpipe['id'], currpipe['kp']))
+
+#         select case(NUNIT)
+#           case(0, 1)
+#             KP(1:NP) = 9.517E-4 * L(1:NP) / D(1:NP)**4.87
+#           case(2, 3)
+#             KP(1:NP) = 2.12E-3 * L(1:NP) / D(1:NP)**4.87
+#         end select
+            nct = 0
+            ssum = 100.0
+            done = False
+            converged = False
+
+#         NCT = 0
+#         SSUM = 100.0
+#         CONVERGED = .false.
+#         DONE = .false.
+
+            npipes = case_dom['params'].npipes
+            njunctions = case_dom['params'].njunctions
+            while not done:
+                pmap = case_dom['junc']['pipe_map']
+                b = np.zeros((npipes))
+                a = np.zeros((npipes, npipes))
+                for idx in pmap:
+                    pipe_id = pmap[idx]['id']
+                    jfrom = pmap[idx]['from']
+                    jto = pmap[idx]['to']
+                    _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
+                                  .format(pipe_id, jfrom, jto))
+                    if jfrom < njunctions - 1:
+                        a[jfrom, pipe_id] = -1.0
+                    if jto < njunctions - 1:
+                        a[jto, pipe_id] = 1.0
+
+                for idx in case_dom['junc']['inflows']:
+                    if idx < njunctions - 1:
+                        b[idx] = case_dom['junc']['inflows'][idx] \
+                                 .to_base_units().magnitude
+
+                print(repr(a))
+                print(repr(b))
+
+# L20:    do while (.not. DONE)
+#             II = 1
+#             do I = 1, NJ1
+#                 A(I, 1:NPP) = 0.0
+#                 NNJ = NN(I)
+#                 do J = 1, NNJ
+#                     A(I, abs(JN(I,J))) = PJDIR(I, J)
+#                 end do
+
+#                 if (IFLOW(I) /= 0) then
+#                     A(I,NPP) = QJ(II)
+#                     II = II + 1
+#                 end if
+#             end do
+
+#             do I = NJ, NP
+# !?                A(I, 1:NPP) = 0.0
+#                 A(I, 1:NP) = 0.0
+#                 II = I - NJ1
+# !                NNJ = LP(NPLMAX+1, II)
+#                 do J = 1, LP(NPLMAX+1, II)
+#                     IJ = LP(J ,II)
+#                     IIJ = abs(IJ)
+#                     if (IJ < 0) then
+#                         A(I, IIJ) = -KP(IIJ)
+#                     else
+#                         A(I, IIJ) = KP(IIJ)
+#                     end if
+#                 end do
+#                 A(I,NPP) = 0.0
+#             end do
+
+#             V(1) = 4.0
+# ! System subroutine from UNIVAC MATH-PACK to solve linear system of
+# ! equations
+# ! Sperry alternate return point syntax not supported
+# !      CALL GJR(A, 51, 50, NP, NPP, $98, JC, V)
+#             call GJR(A, NPMAX+1, NPMAX, NP, NPP, 98, JC, V)
+
+#             if (JC(1) /= NP) then
+#                 write(STDOUT, "('Matrix failure:', /,"                     &
+#                     // "'JC(1): ', I3, ' <> NP: ', I3)") JC(1), NP
+#                 goto 98
+#             end if
+
+#             if (NCT > 0) then
+#                 SSUM = 0.0
+#             end if
+
+#             do I = 1, NP
+#                 BB = A(I,NPP)
+
+#                 if (NCT > 0) then
+#                     QM = 0.5 * (Q(I) + BB)
+#                     SSUM = SSUM + abs(Q(I) - BB)
+#                 else
+#                     QM = BB
+#                 end if
+
+#                 Q(I) = QM
+#                 DELQ = QM * DELQ1
+#                 QM = abs(QM)
+#                 VE = QM / AR(I)
+
+#                 QQ(1) = QM - DELQ
+#                 QQ(2) = QM + DELQ
+
+#                 VV = QQ / AR(I)
+#                 if (VV(1) < 0.001) then
+#                     write(STDOUT, "('Note: V1 adjusted from ', ES12.4," &
+#                                   // "' to ', ES12.4)") VV(1), 0.002
+#                     VV(1) = 0.002
+#                 end if
+#                 RE = VV * D(I) / VIS
+
+# !                if (RE(2) <= 2.1E3) then
+#                 if (maxval(RE) <= 2.1E3) then
+#                     ! Laminar flow
+#                     F = f_laminar(RE)
+#                     EXPP(I) = 1.0
+# !                    KP(I) = 64.4 * VIS * ARL(I) / D(I)
+# !orig                KP(I) = 2.0 * GRAV_ES * VIS * ARL(I) / D(I)
+#                     KP(I) = G2 * VIS * ARL(I) / D(I)
+#                 else
+#                     F = f_rough(E(I), D(I))
+#                     PAR = transition_rough_metric1(F(1), E(I), VE, VIS)
+# !                    PAR = VE * sqrt(0.125 * F) * D(I) * E(I) / VIS
+#                     if (PAR > 65.0) then
+#                         ! Fully-rough-pipe flow
+#                         KP(I) = F(1) * ARL(I) * QM**2
+#                         EXPP(I) = 2.0
+#                     else
+#                         ! Newton's method root finder to calculate
+#                         ! Darcy-Weisback friction factor in transition
+#                         ! region
+
+#                         F(1) = f_transition(F(1), QQ(1), D(I), E(I),    &
+#                                             VIS, MAXMITER, MAXDIF)
+#                         F(2) = f_transition(F(1), QQ(2), D(I), E(I),    &
+#                                             VIS, MAXMITER, MAXDIF)
+
+#                         BE = (log(F(1)) - log(F(2)))                    &
+#                            / (log(QQ(1)) - log(QQ(2)))
+#                         AE = F(1) * QQ(1)**BE
+#                         EP = 1.0 - BE
+#                         EXPP(I) = 2.0 - BE
+#                         KP(I) = AE * ARL(I) * QM ** EP
+#                     end if
+#                 end if
+#             end do
+
+#             NCT = NCT + 1
+                nct += 1
+
+# ! The next three cards can be removed
+#             write(STDOUT,157) NCT, SSUM, Q(1:NP)
+#             write(STDOUT,344) EXPP(1:NP)
+#             write(STDOUT,344) KP(1:NP)
+
+#             CONVERGED = (SSUM <= TOL)
+#             DONE = (CONVERGED .or. (NCT >= MAXITER))
+#         end do L20
+                converged = ssum <= case_dom['params'].tolerance
+                done = converged or (nct >= case_dom['params'].maxiter)
+            # End iteration
+# #######################################################################
 
             # Step 5. Assemble matrix
             _logger.debug('5. Assemble matrix')
