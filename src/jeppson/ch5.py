@@ -16,12 +16,13 @@ from __future__ import division, print_function, absolute_import
 import argparse
 from collections import namedtuple, OrderedDict
 import logging
-from math import copysign
+from math import copysign, log
 import sys
 
 # import iapws
-# import scipy.constants as sc
-# from fluids.friction import friction_factor
+import scipy.constants as sc
+# from fluids.core import Reynolds
+from fluids.friction import friction_factor
 import numpy as np
 
 from . import _logger, ureg, Q_
@@ -84,15 +85,21 @@ idataprop = OrderedDict([
                                 ureg.parse_expression('dimensionless')))
 ])
 
-inputconv = OrderedDict([
-    ('vol_flow',   'ft**3/s'),
-    ('idiameter',  'in'),
-    ('lpipe',      'ft'),
-    ('froughness', 'in'),
-    ('fvol_flow',  ''),
-    ('kin_visc',   'ft**2/s')])
+ugrav = Q_(sc.g, 'm/s**2')
 
-ikeys = inputconv.keys()
+pipe_inputconv = [
+    {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
+    {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
+    {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
+    {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
+]
+
+flow_inputconv = [
+    'skip',
+    'gallon / minute',
+    'ft**3 / sec',
+    'm**3 / sec'
+]
 
 
 def parse_args(args):
@@ -231,13 +238,7 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         (dict): Pipe dimensions and metadata
     """
 
-    inputconv = [
-        {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
-        {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
-        {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
-        {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
-    ]
-    inunit = inputconv[unitcode]
+    inunit = pipe_inputconv[unitcode]
 
     tmppipe = {
         'idiameter': [],
@@ -269,12 +270,12 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
                                      'idiameter': tmppipe['idiameter'][ict],
                                      'lpipe': tmppipe['lpipe'][ict],
                                      'froughness': tmppipe['froughness'][ict]})
-        curpipe = results['pipe_info'][ict]
+        currpipe = results['pipe_info'][ict]
         _logger.debug('  id={0:d}  D= {1:16.4E~} L={2:9.1f~} e={3:16.4E~}'
-                      .format(curpipe['id'],
-                              curpipe['idiameter'],
-                              curpipe['lpipe'],
-                              curpipe['froughness']))
+                      .format(currpipe['id'],
+                              currpipe['idiameter'],
+                              currpipe['lpipe'],
+                              currpipe['froughness']))
     results['status'] = 'ok'
     results['message'] = 'Read diameter, length and roughness ' \
                          'for {:d} pipes'.format(npipes)
@@ -303,13 +304,6 @@ def extract_junctions(deck, iptr, njunctions):
             'pipe_map': {},
         }
     }
-
-    inputconv = [
-        'skip',
-        'gallon / minute',
-        'ft**3 / sec',
-        'm**3 / sec'
-    ]
 
     ji = results['junc_info']
 
@@ -359,7 +353,8 @@ def extract_junctions(deck, iptr, njunctions):
             iread += 1
             _logger.debug('Processing inflow: {0:s}'
                           .format(deck[jptr].as_log()))
-            qinflow = Q_(float(deck[jptr].token[0]), inputconv[inflow_units])
+            qinflow = Q_(float(deck[jptr].token[0]),
+                         flow_inputconv[inflow_units])
             _logger.debug('Inflow of {0:0.4E~}'.format(qinflow))
         else:
             _logger.error('Junction inflow unit specifier out of range')
@@ -568,40 +563,86 @@ def main(args):
 #        ! Calculate loss coefficient KP based on length and diameter
 #        ! unit of measure
 
-            unitcode = case_dom['params'].unitcode
-            if unitcode in (0, 1):
-                # Coefficient for traditional (US) units
-                kpcoeff = 9.517E-4
-            elif unitcode in (2, 3):
-                # Coefficient for mks (SI) units
-                kpcoeff = 2.12E-3
-            else:
-                raise ValueError('Unknown unit code {0:d}, expected (0..3)'
-                                 .format(unitcode))
+            # Note: Use SI coefficient since base units are SI (mks)
+            kpcoeff = 2.12E-3
+#            unitcode = case_dom['params'].unitcode
+#            if unitcode in (0, 1):
+#                # Coefficient for traditional (US) units
+#                kpcoeff = 9.517E-4
+#            elif unitcode in (2, 3):
+#                # Coefficient for mks (SI) units
+#                kpcoeff = 2.12E-3
+#            else:
+#                raise ValueError('Unknown unit code {0:d}, expected (0..3)'
+#                                 .format(unitcode))
 
             for currpipe in case_dom['pipe']:
-                ld = (currpipe['lpipe'].to_base_units()
-                      / currpipe['idiameter'].to_base_units()).magnitude
-                currpipe['kp'] = kpcoeff * ld ** 4.87
-                _logger.debug('Pipe {0:d} Kp = {1:0.4E}'
-                              .format(currpipe['id'], currpipe['kp']))
+                ld = (currpipe['lpipe'] / currpipe['idiameter']
+                      ).to_base_units().magnitude
+                currpipe['flow_area'] = (
+                    sc.pi / 4.0 * currpipe['idiameter']**2).to_base_units()
+                currpipe['arl'] = (
+                    currpipe['lpipe'] / (2.0 * ugrav * currpipe['idiameter']
+                                         * currpipe['flow_area']**2)
+                ).to_base_units()
+#                _logger.debug('ARL is in {0:s}'.format(currpipe['arl'].units))
+                currpipe['eroughness'] = (
+                    currpipe['froughness']
+                    / currpipe['idiameter']
+                ).to_base_units()
 
-#         select case(NUNIT)
-#           case(0, 1)
-#             KP(1:NP) = 9.517E-4 * L(1:NP) / D(1:NP)**4.87
-#           case(2, 3)
-#             KP(1:NP) = 2.12E-3 * L(1:NP) / D(1:NP)**4.87
-#         end select
+                currpipe['expp'] = 0.0
+                currpipe['kp'] = kpcoeff * ld ** 4.87
+
+                _logger.debug('Pipe {0:d}: Kp = {1:0.4E}, Aflow = {2:0.4E~}'
+                              .format(currpipe['id'],
+                                      currpipe['kp'],
+                                      currpipe['flow_area']))
+
+# +        select case(NUNIT)
+# +          case(0, 1)
+# +            KP(1:NP) = 9.517E-4 * L(1:NP) / D(1:NP)**4.87
+# +          case(2, 3)
+# +            KP(1:NP) = 2.12E-3 * L(1:NP) / D(1:NP)**4.87
+# +        end select
             nct = 0
             ssum = 100.0
             done = False
             converged = False
+            qpredict = np.zeros(case_dom['params'].npipes)
 
-#         NCT = 0
-#         SSUM = 100.0
-#         CONVERGED = .false.
-#         DONE = .false.
+# +        NCT = 0
+# +        SSUM = 100.0
+# +        CONVERGED = .false.
+# +        DONE = .false.
 
+# The goal of this project is to reimplement the JEPPSON_CH5 code in Python,
+# not simply translate the original Fortran into Python. For this reason, pipe,
+# junction, and loop indices are zero-based, default NumPy matrix storage is
+# used. This complicates the comparison between the original Fortran and the
+# Python implementations, but effectively illusrates the differences in
+# implementing the solution in each language.
+
+# The matrix a is constructed in the same manner as in the original Fortran
+# application with a few modifications. While NumPy multidimensional array
+# storage can be set to either C-style (row-major) or Fortran-style
+# (column-major), the default NumPy style is used - C-style.
+
+# Matrix columns represent flow through pipes. The first (njunctions-1) rows
+# contain 1.0 in a column for outflow via that column's pipe or -1.0 for inflow
+# from that column's pipe. The corresponding term in the first (njunctions - 1)
+# rows of the column vector b contains the fixed flow into the junction from
+# outside the system, positive for inflow and negative for outflow.
+
+# The remaining nloops rows in the a matrix contain the flow resistance of each
+# pipe, positive if the flow convention is clockwise/forward in the loop,
+# negative if the flow convention is counter-clockwise/reverse in the loop.
+# Flow direction/convention is heuristically assigned by the modeler; the
+# actual flow direction will be determined from the problem solution. The
+# corresponding entries in the b column vector are zero since the flow around a
+# loop is conservative - no net increase or decrease.
+
+            flow_units = ''
             npipes = case_dom['params'].npipes
             njunctions = case_dom['params'].njunctions
             while not done:
@@ -620,61 +661,182 @@ def main(args):
                         a[jto, pipe_id] = 1.0
 
                 for idx in case_dom['junc']['inflows']:
+                    # Use base units of first non-zero flow for result
+                    # conversion.
+                    if flow_units == '' and case_dom['junc']['inflows'][idx] \
+                                            .magnitude != 0.0:
+                        flow_units = case_dom['junc']['inflows'][idx] \
+                                     .to_base_units().units
                     if idx < njunctions - 1:
                         b[idx] = case_dom['junc']['inflows'][idx] \
                                  .to_base_units().magnitude
 
+                for iloop in case_dom['loop']:
+                    row_id = njunctions - 1 + iloop
+                    _logger.debug('Row id is {0:d} = njunctions + iloop = '
+                                  '{1:d} + {2:d}'.format(row_id, njunctions,
+                                                         iloop))
+                    for pipe in case_dom['loop'][iloop]:
+                        col_id = pipe.pipe_id
+                        resistance = (pipe.flow_dir
+                                      * case_dom['pipe'][pipe.pipe_id]['kp'])
+                        _logger.debug('  Col id is {0:d}; resistance = '
+                                      '{1:0.4E}'.format(col_id, resistance))
+                        a[row_id, col_id] = resistance
+
+                _logger.debug('Resultant flows are in units of {0:s}'
+                              .format(flow_units))
+
                 print(repr(a))
                 print(repr(b))
 
-# L20:    do while (.not. DONE)
-#             II = 1
-#             do I = 1, NJ1
-#                 A(I, 1:NPP) = 0.0
-#                 NNJ = NN(I)
-#                 do J = 1, NNJ
-#                     A(I, abs(JN(I,J))) = PJDIR(I, J)
-#                 end do
+                # Call matrix solver
+                try:
+                    x = np.linalg.solve(a, b)
+                except np.linalg.LinAlgError as err:
+                    msg = 'Cannot solve matrix: {0:s}'.format(str(err))
+                    _logger.error(msg)
+                    print('Error: ' + msg)
+                    converged = False
+                    break
 
-#                 if (IFLOW(I) /= 0) then
-#                     A(I,NPP) = QJ(II)
-#                     II = II + 1
-#                 end if
-#             end do
+                print(repr(x))
 
-#             do I = NJ, NP
-# !?                A(I, 1:NPP) = 0.0
-#                 A(I, 1:NP) = 0.0
-#                 II = I - NJ1
-# !                NNJ = LP(NPLMAX+1, II)
-#                 do J = 1, LP(NPLMAX+1, II)
-#                     IJ = LP(J ,II)
-#                     IIJ = abs(IJ)
-#                     if (IJ < 0) then
-#                         A(I, IIJ) = -KP(IIJ)
-#                     else
-#                         A(I, IIJ) = KP(IIJ)
-#                     end if
-#                 end do
-#                 A(I,NPP) = 0.0
-#             end do
+                if nct > 0:
+                    ssum = 0.0
 
-#             V(1) = 4.0
-# ! System subroutine from UNIVAC MATH-PACK to solve linear system of
-# ! equations
-# ! Sperry alternate return point syntax not supported
-# !      CALL GJR(A, 51, 50, NP, NPP, $98, JC, V)
-#             call GJR(A, NPMAX+1, NPMAX, NP, NPP, 98, JC, V)
+# +L20:    do while (.not. DONE)
+# +            II = 1
+# +            do I = 1, NJ1
+# +                A(I, 1:NPP) = 0.0
+# +                NNJ = NN(I)        
+        
+        
+        
+        
+        
+        
+        
 
-#             if (JC(1) /= NP) then
-#                 write(STDOUT, "('Matrix failure:', /,"                     &
-#                     // "'JC(1): ', I3, ' <> NP: ', I3)") JC(1), NP
-#                 goto 98
-#             end if
+# +                do J = 1, NNJ
+# +                    A(I, abs(JN(I,J))) = PJDIR(I, J)
+# +                end do
 
-#             if (NCT > 0) then
-#                 SSUM = 0.0
-#             end if
+# +                if (IFLOW(I) /= 0) then
+# +                    A(I,NPP) = QJ(II)
+# +                    II = II + 1
+# +                end if
+# +            end do
+
+# +            do I = NJ, NP
+# +!?                A(I, 1:NPP) = 0.0
+# +                A(I, 1:NP) = 0.0
+# +                II = I - NJ1
+# +!                NNJ = LP(NPLMAX+1, II)
+# +                do J = 1, LP(NPLMAX+1, II)
+# +                    IJ = LP(J ,II)
+# +                    IIJ = abs(IJ)
+# +                    if (IJ < 0) then
+# +                        A(I, IIJ) = -KP(IIJ)
+# +                    else
+# +                        A(I, IIJ) = KP(IIJ)
+# +                    end if
+# +                end do
+# +                A(I,NPP) = 0.0
+# +            end do
+
+# +            V(1) = 4.0
+# +! System subroutine from UNIVAC MATH-PACK to solve linear system of
+# +! equations
+# +! Sperry alternate return point syntax not supported
+# +!      CALL GJR(A, 51, 50, NP, NPP, $98, JC, V)
+# +            call GJR(A, NPMAX+1, NPMAX, NP, NPP, 98, JC, V)
+
+# +            if (JC(1) /= NP) then
+# +                write(STDOUT, "('Matrix failure:', /,"                     &
+# +                    // "'JC(1): ', I3, ' <> NP: ', I3)") JC(1), NP
+# +                goto 98
+# +            end if
+
+# +            if (NCT > 0) then
+# +                SSUM = 0.0
+# +            end if
+
+                for ipipe, currpipe in enumerate(case_dom['pipe']):
+                    if nct > 0:
+                        qm = 0.5 * (qpredict[ipipe] + b[ipipe])
+                        ssum += abs(qpredict[ipipe] - b[ipipe])
+                    else:
+                        qm = b[ipipe]
+
+                    qpredict[ipipe] = qm
+                    dq = Q_(qm * case_dom['params'].fvol_flow, flow_units)
+                    qmu = Q_(abs(qm), flow_units)
+#                    vflowe = qmu / currpipe['flow_area']
+
+                    qq_lo = qmu - dq
+                    vflowv_lo = qq_lo / currpipe['flow_area']
+
+                    qq_hi = qmu + dq
+                    vflowv_hi = qq_hi / currpipe['flow_area']
+
+                    if vflowv_lo.magnitude < 0.001:
+                        vflowv_lo = Q_(0.002, vflowv_lo.units)
+                        _logger.info('  Flow velocity low endpoint for pipe '
+                                     '{0:d} increased to {1:0.4E~}'
+                                     .format(ipipe, vflowv_lo))
+
+                    re_lo = (vflowv_lo * currpipe['idiameter']
+                             / case_dom['params'].kin_visc).to_base_units()
+
+                    re_hi = (vflowv_hi * currpipe['idiameter']
+                             / case_dom['params'].kin_visc).to_base_units()
+
+                    _logger.debug('  Pipe {0:d} Re varies from {1:0.4E~} to '
+                                  '{1:0.4E~}'.format(ipipe, re_lo, re_hi))
+
+                    friction_lo = friction_factor(
+                        Re=re_lo, eD=currpipe['eroughness'].magnitude)
+
+                    friction_hi = friction_factor(
+                        Re=re_hi, eD=currpipe['eroughness'].magnitude)
+
+                    _logger.debug('  Pipe {0:d} f varies from {1:0.4E~} to '
+                                  '{1:0.4E~}'.format(ipipe, friction_lo,
+                                                     friction_hi))
+
+                    # Calculate new Kp for each pipe based on flow regime and
+                    # friction factor
+
+                    # Note: Flow is laminar for Reynolds number less than 2050
+                    if re_lo < 2050.0:
+                        currpipe['expp'] = 1.0
+                        tmp_kp = (
+                            2.0 * ugrav * case_dom['params'].kin_visc
+                            * currpipe['arl'] / currpipe['idiameter']
+                        )
+                        _logger.debug('  tmp_kp is in units of {0:s}'
+                                .format(tmp_kp.units))
+                        currpipe['kp'] = tmp_kp.to('1/ft**3/s').magnitude
+                        _logger.debug('  Pipe {0:d} flow in laminar region'
+                                      .format(ipipe))
+                    else:
+                        # Consider only transition regime, not transition-rough
+                        be = ((log(friction_lo) - log(friction_hi))
+                              / (log(qq_lo.to('ft**3/s').magnitude)
+                                 - log(qq_hi.to('ft**3/s').magnitude)))
+                        ae = friction_lo * qq_lo.to('ft**3/s').magnitude**be
+                        ep = 1.0 - be
+                        currpipe['expp'] = 2.0 - be
+                        currpipe['kp'] = (
+                            ae * currpipe['arl'].to('s**2/ft**5').magnitude
+                            * qmu.to('ft**3/s').magnitude**ep).magnitude
+                        _logger.debug('  arl is in units of {0:s}'
+                                      .format(currpipe['arl'].units))
+                        _logger.debug('  Pipe {0:d} flow in transition / '
+                                      'turbulent region'.format(ipipe))
+                    _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
+                                  .format(ipipe, currpipe['kp']))
 
 #             do I = 1, NP
 #                 BB = A(I,NPP)
@@ -739,7 +901,6 @@ def main(args):
 #             end do
 
 #             NCT = NCT + 1
-                nct += 1
 
 # ! The next three cards can be removed
 #             write(STDOUT,157) NCT, SSUM, Q(1:NP)
@@ -749,10 +910,36 @@ def main(args):
 #             CONVERGED = (SSUM <= TOL)
 #             DONE = (CONVERGED .or. (NCT >= MAXITER))
 #         end do L20
+                _logger.debug('Iteration {0:d}'.format(nct))
+                _logger.debug('Deviation {0:0.4E}'.format(ssum))
+                for ipipe, currpipe in enumerate(case_dom['pipe']):
+                    _logger.debug('Pipe {0:d}: Kp = {1:0.4E}, expp = '
+                        '{2:0.4E}, Q = {3:0.4E~}'
+                        .format(ipipe,
+                                currpipe['kp'], 
+                                currpipe['expp'],
+                                Q_(qpredict[ipipe], 'm**3/s')
+                                .to('ft**3/s')))
+
+                for iflow, xflow in enumerate(x):
+                    qfinal = Q_(xflow, 'm**3/s')
+                    _logger.debug('Pipe {0:d}: {1:12.4E~}    {2:12.4E~}'
+                                  '    {3:12.4E~}'
+                                  .format(iflow,
+                                          qfinal.to('m**3/s'),
+                                          qfinal.to('ft**3/s'), 
+                                          qfinal.to('gallon/minute')))
+
+                nct += 1
+
                 converged = ssum <= case_dom['params'].tolerance
                 done = converged or (nct >= case_dom['params'].maxiter)
             # End iteration
 # #######################################################################
+            if not converged:
+                _logger.info('Case not converged: ssum = {0:0.4E}'
+                             .format(ssum))
+
 
             # Step 5. Assemble matrix
             _logger.debug('5. Assemble matrix')
