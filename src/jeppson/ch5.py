@@ -161,6 +161,9 @@ def extract_case_parameters(deck, iptr):
 
     Returns:
         (dict): Case parameters
+
+    Raises:
+        ValueError: Too few case parameters detected
     """
     tags = ('npipes', 'njunctions', 'nloops', 'maxiter', 'unitcode',
             'tolerance', 'kin_visc', 'fvol_flow')
@@ -295,6 +298,10 @@ def extract_junctions(deck, iptr, njunctions):
 
     Returns:
         (dict): Junction info and metadata
+
+    Raises:
+        ValueError: Pipe ID out of range (<1) or junction flow unit specifier
+        out of range (not in [0..3])
     """
 #    PipeRoute = namedtuple('PipeRoute', ['pipe_id', 'from', 'to', 'inflow'])
     results = {
@@ -407,6 +414,9 @@ def extract_loops(deck, iptr, nloops):
 
     Returns:
         (dict): Pipe loop info and metadata
+
+    Raises:
+        ValueError: Pipe ID out of range (<1) in loop definition
     """
 
     results = {
@@ -472,11 +482,11 @@ def extract_loops(deck, iptr, nloops):
 
 def extract_case(iptr, deck):
     """Extract complete pipe flow network analysis case from user input
-    
+
     Args:
         iptr (int): Pointer to first unread line of user input in deck
         deck (InputLine): List of tokenized lines of user input
-        
+
     Returns:
         (dict): Pipe flow network object model
         """
@@ -817,6 +827,8 @@ def main(args):
 
                 converged = ssum <= case_dom['params'].tolerance
                 done = converged or (nct >= case_dom['params'].maxiter)
+
+                _logger.debug('9. Display interim results')
             # End iteration
 # #######################################################################
             if not converged:
@@ -825,33 +837,7 @@ def main(args):
                                 .format(ssum, case_dom['params'].tolerance))
 
             # Step 7. Display results
-            _logger.debug('9. Display results')
-
-#138 format(' HEAD LOSSES IN PIPES'/,(' ', 13F10.3))
-#107 format('O FLOWRATES IN PIPES IN FT**3/SEC', /,                      &
-#           (' ', 13F10.3))
-#105 format(' FLOW RATES (GPM)', /, (' ',13F10.1))
-#127 format('O FLOWRATES IN PIPES IN M**3/SEC', /,                       &
-#           (' ', 13E10.4))
-#        select case(NUNIT)
-#          case(0, 1)
-#            ! Flow in cfs
-#            write(STDOUT, 107) Q(1:NP)
-#            KP(1:NP) = KP(1:NP) * abs(Q(1:NP))
-#            Q(1:NP) = GPM_PER_CFS * Q(1:NP)
-
-#            write(STDOUT,138) KP(1:NP)
-
-#            write(STDOUT,105) Q(1:NP)
-
-#            cycle L30
-#          case(2, 3)
-#            write(STDOUT,127) Q(1:NP)
-
-#            KP(1:NP) = KP(1:NP) * abs(Q(1:NP))
-
-#            write(STDOUT, 138) KP(1:NP)
-#        end select
+            _logger.debug('10. Display final results')
 
             print('Pipe  Flow                     Flow'
                   '                      Flow'
