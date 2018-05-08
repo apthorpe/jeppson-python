@@ -16,7 +16,7 @@ from __future__ import division, print_function, absolute_import
 import argparse
 from collections import namedtuple, OrderedDict
 import logging
-from math import copysign, log
+from math import copysign, log, nan
 import sys
 
 # import iapws
@@ -168,64 +168,55 @@ def extract_case_parameters(deck, iptr):
     tags = ('npipes', 'njunctions', 'nloops', 'maxiter', 'unitcode',
             'tolerance', 'kin_visc', 'fvol_flow')
     mintok = len(tags)
-    CaseParameters = namedtuple("CaseParameters", tags)
 
-    results = {
-        'status': 'unknown',
-        'msg': 'CaseParameters are not initialized',
-        'iread': 1
+    case_params = {
+        '_iread': 1
     }
+
+    for idx in tags:
+        case_params['idx'] = nan
 
     cpline = deck[iptr]
     if cpline.ntok < mintok:
-        msg = 'Too few entries found for case parameters'
-        results['status'] = 'error'
-        results['msg'] = msg
-        results['case_parameters'] = ()
+        msg = 'Too few entries found for case parameters ({0:d} expected)' \
+              .format(mintok)
         raise ValueError(msg)
     elif cpline.ntok > mintok:
-        results['status'] = 'warning'
-        results['msg'] = 'More entries found than expected for case parameters'
+        msg = 'Too many entries found for case parameters ({0:d} found, ' \
+              '{1:d} expected)'.format(cpline.ntok, mintok)
+        _logger.warning(msg)
+
+    case_params['npipes'] = int(cpline.token[0])
+    case_params['njunctions'] = int(cpline.token[1])
+    case_params['nloops'] = int(cpline.token[2])
+    case_params['maxiter'] = int(cpline.token[3])
+    case_params['unitcode'] = int(cpline.token[4])
+    case_params['tolerance'] = float(cpline.token[5])
+    if case_params['unitcode'] <= 1:
+        case_params['kin_visc'] = Q_(float(cpline.token[6]), 'ft**2/s')
     else:
-        results['status'] = 'ok'
-        results['msg'] = 'Expected number of parameters found'
+        case_params['kin_visc'] = Q_(float(cpline.token[6]), 'm**2/s')
+    case_params['fvol_flow'] = float(cpline.token[7])
 
-    if results['status'] in ('ok', 'warning'):
-        npipes = int(cpline.token[0])
-        njunctions = int(cpline.token[1])
-        nloops = int(cpline.token[2])
-        maxiter = int(cpline.token[3])
-        unitcode = int(cpline.token[4])
-        tolerance = float(cpline.token[5])
-        if unitcode <= 1:
-            kinvisc = Q_(float(cpline.token[6]), 'ft**2/s')
-        else:
-            kinvisc = Q_(float(cpline.token[6]), 'm**2/s')
-        fvol_flow = float(cpline.token[7])
+    _logger.debug('Successfully read case parameters')
+    _logger.debug('  npipes = {0:d}'
+                  .format(case_params['npipes']))
+    _logger.debug('  njunctions = {0:d}'
+                  .format(case_params['njunctions']))
+    _logger.debug('  nloops = {0:d}'
+                  .format(case_params['nloops']))
+    _logger.debug('  maxiter = {0:d}'
+                  .format(case_params['maxiter']))
+    _logger.debug('  unitcode = {0:d}'
+                  .format(case_params['unitcode']))
+    _logger.debug('  tolerance = {0:0.4E}'
+                  .format(case_params['tolerance']))
+    _logger.debug('  kin_visc = {0:0.4E~}'
+                  .format(case_params['kin_visc']))
+    _logger.debug('  fvol_flow = {0:0.4f}'
+                  .format(case_params['fvol_flow']))
 
-        results['case_parameters'] = CaseParameters(
-            npipes, njunctions, nloops, maxiter,
-            unitcode, tolerance, kinvisc, fvol_flow)
-
-        _logger.debug('Successfully read case parameters')
-        _logger.debug('  npipes = {0:d}'
-                      .format(results['case_parameters'].npipes))
-        _logger.debug('  njunctions = {0:d}'
-                      .format(results['case_parameters'].njunctions))
-        _logger.debug('  nloops = {0:d}'
-                      .format(results['case_parameters'].nloops))
-        _logger.debug('  maxiter = {0:d}'
-                      .format(results['case_parameters'].maxiter))
-        _logger.debug('  unitcode = {0:d}'
-                      .format(results['case_parameters'].unitcode))
-        _logger.debug('  tolerance = {0:0.4E}'
-                      .format(results['case_parameters'].tolerance))
-        _logger.debug('  kin_visc = {0:0.4E~}'
-                      .format(results['case_parameters'].kin_visc))
-        _logger.debug('  fvol_flow = {0:0.4f}'
-                      .format(results['case_parameters'].fvol_flow))
-
-    return results
+    return case_params
 
 
 def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
@@ -495,13 +486,12 @@ def extract_case(iptr, deck):
 
     # Step 1. Extract case parameters
     _logger.debug('1. Extracting case parameters')
-    case_info = extract_case_parameters(deck, iptr)
 
-    case_dom['params'] = case_info['case_parameters']
+    case_dom['params'] = extract_case_parameters(deck, iptr)
 
-    iptr += case_info['iread']
+    iptr += case_dom['params']['_iread']
 
-    npipes = case_info['case_parameters'].npipes
+    npipes = case_dom['params']['npipes']
     npipecards = 1
     pipect = deck[iptr].ntok
     while pipect < npipes:
@@ -512,7 +502,7 @@ def extract_case(iptr, deck):
                   .format(pipect, npipes, npipecards))
     # Step 2. Read pipe data
     _logger.debug('2. Reading pipe data')
-    unitcode = case_info['case_parameters'].unitcode
+    unitcode = case_dom['params']['unitcode']
     pipe_info = extract_pipe_definitions(deck, iptr, npipes,
                                          npipecards, unitcode)
 
@@ -523,7 +513,7 @@ def extract_case(iptr, deck):
     # Step 3. Read junction data
     _logger.debug('3. Reading junction inflows and pipe network '
                   'topology')
-    njunctions = case_info['case_parameters'].njunctions
+    njunctions = case_dom['params']['njunctions']
     pipemap_info = extract_junctions(deck, iptr, njunctions)
 
     case_dom['junc'] = pipemap_info['junc_info']
@@ -532,7 +522,7 @@ def extract_case(iptr, deck):
 
     # Step 4. Read loop data
     _logger.debug('4. Reading loop continuity data')
-    nloops = case_info['case_parameters'].nloops
+    nloops = case_dom['params']['nloops']
     pipeloop_info = extract_loops(deck, iptr, nloops)
 
     case_dom['loop'] = pipeloop_info['loop_info']
@@ -628,7 +618,8 @@ def main(args):
             ssum = 100.0
             done = False
             converged = False
-            qpredict = np.zeros(case_dom['params'].npipes)
+            npipes = case_dom['params']['npipes']
+            qpredict = np.zeros(npipes)
 
 # The goal of this project is to reimplement the JEPPSON_CH5 code in Python,
 # not simply translate the original Fortran into Python. For this reason, pipe,
@@ -657,8 +648,7 @@ def main(args):
 # loop is conservative - no net increase or decrease.
 
             flow_units = ''
-            npipes = case_dom['params'].npipes
-            njunctions = case_dom['params'].njunctions
+            njunctions = case_dom['params']['njunctions']
             while not done:
                 # Step 5. Assemble matrix
                 _logger.debug('5. Assemble matrix')
@@ -732,7 +722,7 @@ def main(args):
                         qm = x[ipipe]
 
                     qpredict[ipipe] = qm
-                    dq = Q_(qm * case_dom['params'].fvol_flow, flow_units)
+                    dq = Q_(qm * case_dom['params']['fvol_flow'], flow_units)
                     qmu = Q_(abs(qm), flow_units)
 #                    vflowe = qmu / currpipe['flow_area']
 
@@ -749,10 +739,10 @@ def main(args):
                                      .format(ipipe, vflowv_lo))
 
                     re_lo = (vflowv_lo * currpipe['idiameter']
-                             / case_dom['params'].kin_visc).to_base_units()
+                             / case_dom['params']['kin_visc']).to_base_units()
 
                     re_hi = (vflowv_hi * currpipe['idiameter']
-                             / case_dom['params'].kin_visc).to_base_units()
+                             / case_dom['params']['kin_visc']).to_base_units()
 
                     _logger.debug('  Pipe {0:d} Re varies from {1:0.4E~} to '
                                   '{1:0.4E~}'.format(ipipe, re_lo, re_hi))
@@ -774,7 +764,7 @@ def main(args):
                     if re_lo < 2050.0:
                         currpipe['expp'] = 1.0
                         tmp_kp = (
-                            2.0 * ugrav * case_dom['params'].kin_visc
+                            2.0 * ugrav * case_dom['params']['kin_visc']
                             * currpipe['arl'] / currpipe['idiameter']
                         )
 #                        _logger.debug('  tmp_kp is in units of {0:s}'
@@ -825,8 +815,8 @@ def main(args):
 
                 _logger.debug('8. Check convergence')
 
-                converged = ssum <= case_dom['params'].tolerance
-                done = converged or (nct >= case_dom['params'].maxiter)
+                converged = ssum <= case_dom['params']['tolerance']
+                done = converged or (nct >= case_dom['params']['maxiter'])
 
                 _logger.debug('9. Display interim results')
             # End iteration
@@ -834,7 +824,7 @@ def main(args):
             if not converged:
                 _logger.warning('Case not converged: ssum = {0:0.4E} > '
                                 'tolerance {1:0.4E}'
-                                .format(ssum, case_dom['params'].tolerance))
+                                .format(ssum, case_dom['params']['tolerance']))
 
             # Step 7. Display results
             _logger.debug('10. Display final results')
