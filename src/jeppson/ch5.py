@@ -242,7 +242,6 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         'froughness': []
     }
 
-    
     pipe_info = []
 
     for ict in range(npipecards):
@@ -286,7 +285,7 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
     return pipe_info
 
 
-def extract_junctions(deck, iptr, njunctions):
+def extract_junctions(deck, iptr, njunctions, npipes):
     """Extract junction information from user input
 
     Args:
@@ -303,16 +302,19 @@ def extract_junctions(deck, iptr, njunctions):
     """
 #    PipeRoute = namedtuple('PipeRoute', ['pipe_id', 'from', 'to', 'inflow'])
     results = {
-        'status': 'unknown',
-        'msg': 'Junction info results not initialized',
-        'iread': 0,
+        '_iread': 0,
         'junc_info': {
-            'inflows': {},
-            'pipe_map': {},
+            'inflows': [],
+            'pipe_map': []
         }
     }
 
     ji = results['junc_info']
+    for idx in range(njunctions):
+        ji['inflows'].append(Q_(0.0, 'm**3/s'))
+
+    for idx in range(npipes):
+        ji['pipe_map'].append({'id': idx, 'to': None, 'from': None})
 
     jptr = iptr
     iread = 0
@@ -329,14 +331,10 @@ def extract_junctions(deck, iptr, njunctions):
             pipe_in = pipe_id > 0
             pipe_read_id = abs(pipe_id)
             pipe_stored_id = pipe_read_id - 1
-            if pipe_stored_id not in ji['pipe_map']:
-                ji['pipe_map'][pipe_stored_id] = {'id': pipe_stored_id}
 
             if pipe_read_id == 0:
                 msg = 'Junction {0:d} member {1:d} has pipe id ' \
                       'out of range: (0):'.format(junc_id, itok+1)
-                results['status'] = 'error'
-                results['msg'] = msg
                 _logger.error(msg)
                 raise ValueError(msg)
             else:
@@ -344,35 +342,37 @@ def extract_junctions(deck, iptr, njunctions):
                 _logger.debug('Note: Pipe id adjusted from {0:d} to {1:d} due '
                               'to zero-indexing'.format(pipe_read_id,
                                                         pipe_stored_id))
+                pipespan = ji['pipe_map'][pipe_stored_id]
+                if 'id' not in pipespan:
+                    pipespan['id'] = pipe_stored_id
+
                 if pipe_in:
                     pipe_dir = 'inflow'
-                    ji['pipe_map'][pipe_stored_id]['to'] = junc_id
+                    pipespan['to'] = junc_id
                 else:
                     pipe_dir = 'outflow'
-                    ji['pipe_map'][pipe_stored_id]['from'] = junc_id
+                    pipespan['from'] = junc_id
+
                 _logger.debug('Junction {0:d} member {1:d} is pipe {2:d}, '
                               '{3:s}'.format(junc_id, itok+1, pipe_stored_id,
                                              pipe_dir))
 
-        qinflow = Q_(0.0, 'm**3 / sec')
         if inflow_units < 1:
             _logger.debug('No inflow')
         elif inflow_units < 4:
             jptr += 1
             iread += 1
-            _logger.debug('Processing inflow: {0:s}'
-                          .format(deck[jptr].as_log()))
-            qinflow = Q_(float(deck[jptr].token[0]),
-                         flow_inputconv[inflow_units])
-            _logger.debug('Inflow of {0:0.4E~}'.format(qinflow))
+            _logger.debug('Processing junction {0:d} inflow: {1:s}'
+                          .format(junc_id, deck[jptr].as_log()))
+            ji['inflows'][junc_id] = Q_(float(deck[jptr].token[0]),
+                                     flow_inputconv[inflow_units])
+            _logger.debug('Inflow of {0:0.4E~}'
+                          .format(ji['inflows'][junc_id]))
         else:
             msg = 'Pipe {0:d} junction inflow unit specifier out of range' \
                   .format(ictr)
             _logger.error(msg)
-            results['status'] = 'error'
-            results['msg'] = msg
             raise ValueError(msg)
-        ji['inflows'][junc_id] = qinflow
 
         jptr += 1
 
@@ -380,25 +380,21 @@ def extract_junctions(deck, iptr, njunctions):
     _logger.debug('next line to read is #{0:d}: {1:s}'
                   .format(jptr, deck[jptr].as_log()))
 
-    results['iread'] = iread
-    if results['status'] == 'unknown':
-        results['status'] = 'ok'
-        results['msg'] = 'Read {0:d} junctions over {1:d} input lines.' \
-                         .format(ictr, iread)
-
-    _logger.debug(results['status'] + ': ' + results['msg'])
+    results['_iread'] = iread
+    _logger.debug('Read {0:d} junctions over {1:d} input lines.'
+                  .format(ictr, iread))
 
     _logger.debug('Pipe network topology:')
-    for idx in sorted(ji['pipe_map'].keys()):
+    for idx, currpipe in enumerate(ji['pipe_map']):
         _logger.debug('  Pipe {0:d} connects junction {1:d} to junction {2:d}'
-                      .format(ji['pipe_map'][idx]['id'],
-                              ji['pipe_map'][idx]['from'],
-                              ji['pipe_map'][idx]['to']))
+                      .format(currpipe['id'],
+                              currpipe['from'],
+                              currpipe['to']))
 
     _logger.debug('Junction inflows:')
-    for idx in sorted(ji['inflows'].keys()):
+    for idx, qinflow in enumerate(ji['inflows']):
         _logger.debug('  Inflow to junction {0:d} is {1:0.4E~}'
-                      .format(idx, ji['inflows'][idx]))
+                      .format(idx, qinflow))
 
     return results
 
@@ -519,11 +515,11 @@ def extract_case(iptr, deck):
     _logger.debug('3. Reading junction inflows and pipe network '
                   'topology')
     njunctions = case_dom['params']['njunctions']
-    pipemap_info = extract_junctions(deck, iptr, njunctions)
+    pipemap_info = extract_junctions(deck, iptr, njunctions, npipes)
 
     case_dom['junc'] = pipemap_info['junc_info']
 
-    iptr += pipemap_info['iread']
+    iptr += pipemap_info['_iread']
 
     # Step 4. Read loop data
     _logger.debug('4. Reading loop continuity data')
@@ -652,35 +648,32 @@ def main(args):
 # corresponding entries in the b column vector are zero since the flow around a
 # loop is conservative - no net increase or decrease.
 
+            b = np.zeros((npipes))
+            a = np.zeros((npipes, npipes))
             flow_units = ''
             njunctions = case_dom['params']['njunctions']
             while not done:
                 # Step 5. Assemble matrix
                 _logger.debug('5. Assemble matrix')
-                pmap = case_dom['junc']['pipe_map']
-                b = np.zeros((npipes))
-                a = np.zeros((npipes, npipes))
-                for idx in pmap:
-                    pipe_id = pmap[idx]['id']
-                    jfrom = pmap[idx]['from']
-                    jto = pmap[idx]['to']
-                    _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
-                                  .format(pipe_id, jfrom, jto))
-                    if jfrom < njunctions - 1:
-                        a[jfrom, pipe_id] = -1.0
-                    if jto < njunctions - 1:
-                        a[jto, pipe_id] = 1.0
-
-                for idx in case_dom['junc']['inflows']:
-                    # Use base units of first non-zero flow for result
-                    # conversion.
-                    if flow_units == '' and case_dom['junc']['inflows'][idx] \
-                                            .magnitude != 0.0:
-                        flow_units = case_dom['junc']['inflows'][idx] \
-                                     .to_base_units().units
-                    if idx < njunctions - 1:
-                        b[idx] = case_dom['junc']['inflows'][idx] \
-                                 .to_base_units().magnitude
+                if nct == 0:
+                    for pipespan in case_dom['junc']['pipe_map']:
+                        pipe_id = pipespan['id']
+                        jfrom = pipespan['from']
+                        jto = pipespan['to']
+                        _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
+                                      .format(pipe_id, jfrom, jto))
+                        if jfrom < njunctions - 1:
+                            a[jfrom, pipe_id] = -1.0
+                        if jto < njunctions - 1:
+                            a[jto, pipe_id] = 1.0
+    
+                    for idx, inflow in enumerate(case_dom['junc']['inflows']):
+                        # Use base units of first non-zero flow for result
+                        # conversion.
+                        if flow_units == '' and inflow.magnitude != 0.0:
+                            flow_units = inflow.to_base_units().units
+                        if idx < njunctions - 1:
+                            b[idx] = inflow.to_base_units().magnitude
 
                 for iloop in case_dom['loop']:
                     row_id = njunctions - 1 + iloop
