@@ -231,7 +231,7 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         unitcode (int): Code from input file selecting pipe dimension units
 
     Returns:
-        (dict): Pipe dimensions and metadata
+        (list): iList of dicts containing pipe dimensions
     """
 
     inunit = pipe_inputconv[unitcode]
@@ -242,10 +242,8 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         'froughness': []
     }
 
-    results = {
-        '_iread': 3 * npipecards,
-        'pipe_info': []
-    }
+    
+    pipe_info = []
 
     for ict in range(npipecards):
         idiamctr = iptr + ict
@@ -274,18 +272,18 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
                       .format(ndiam, npipes))
 
     for ict in range(npipes):
-        results['pipe_info'].append({'id': ict,
-                                     'idiameter': tmppipe['idiameter'][ict],
-                                     'lpipe': tmppipe['lpipe'][ict],
-                                     'froughness': tmppipe['froughness'][ict]})
-        currpipe = results['pipe_info'][ict]
+        pipe_info.append({'id': ict,
+                          'idiameter': tmppipe['idiameter'][ict],
+                          'lpipe': tmppipe['lpipe'][ict],
+                          'froughness': tmppipe['froughness'][ict]})
+        currpipe = pipe_info[ict]
         _logger.debug('  id={0:d}  D= {1:16.4E~} L={2:9.1f~} e={3:16.4E~}'
                       .format(currpipe['id'],
                               currpipe['idiameter'],
                               currpipe['lpipe'],
                               currpipe['froughness']))
 
-    return results
+    return pipe_info
 
 
 def extract_junctions(deck, iptr, njunctions):
@@ -512,12 +510,10 @@ def extract_case(iptr, deck):
     # Step 2. Read pipe data
     _logger.debug('2. Reading pipe data')
     unitcode = case_dom['params']['unitcode']
-    pipe_info = extract_pipe_definitions(deck, iptr, npipes,
-                                         npipecards, unitcode)
+    case_dom['pipe'] = extract_pipe_definitions(deck, iptr, npipes,
+                                                npipecards, unitcode)
 
-    case_dom['pipe'] = pipe_info['pipe_info']
-
-    iptr += pipe_info['_iread']
+    iptr += 3 * npipecards
 
     # Step 3. Read junction data
     _logger.debug('3. Reading junction inflows and pipe network '
