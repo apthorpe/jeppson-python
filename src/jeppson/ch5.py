@@ -326,10 +326,11 @@ def extract_junctions(deck, iptr, njunctions):
                 ji['pipe_map'][pipe_stored_id] = {'id': pipe_stored_id}
 
             if pipe_read_id == 0:
+                msg = 'Junction {0:d} member {1:d} has pipe id ' \
+                      'out of range: (0):'.format(junc_id, itok+1)
                 results['status'] = 'error'
-                results['msg'] = 'Junction {0:d} member {1:d} has pipe id ' \
-                                 'out of range: (0):'.format(junc_id, itok+1)
-                _logger.error(results['msg'])
+                results['msg'] = msg
+                _logger.error(msg)
             else:
                 # Set to zero-index
                 _logger.debug('Note: Pipe id adjusted from {0:d} to {1:d} due '
@@ -357,10 +358,11 @@ def extract_junctions(deck, iptr, njunctions):
                          flow_inputconv[inflow_units])
             _logger.debug('Inflow of {0:0.4E~}'.format(qinflow))
         else:
-            _logger.error('Junction inflow unit specifier out of range')
+            msg = 'Pipe {0:d} junction inflow unit specifier out of range' \
+                  .format(ictr)
+            _logger.error(msg)
             results['status'] = 'error'
-            results['msg'] = 'Pipe {0:d} junction inflow unit specifier ' \
-                             'out of range'.format(ictr)
+            results['msg'] = msg
         ji['inflows'][junc_id] = qinflow
 
         jptr += 1
@@ -427,9 +429,11 @@ def extract_loops(deck, iptr, nloops):
             looppart = LoopElement(pipe_stored_id, flow_conv)
             results['loop_info'][iloop].append(looppart)
             if pipe_read_id == 0:
+                msg = 'Element {0:d} of loop {1:d} has an invalid pipe id ' \
+                      '(0)'.format(ipos+1, iloop+1)
+                _logger.error(msg)
                 results['status'] = 'error'
-                results['msg'] = 'Element {0:d} of loop {1:d} has an ' \
-                                 'invalid pipe id (0)'.format(ipos+1, iloop+1)
+                results['msg'] = msg
 
         iread += 1
         iloop += 1
@@ -599,22 +603,11 @@ def main(args):
                                       currpipe['kp'],
                                       currpipe['flow_area']))
 
-# +        select case(NUNIT)
-# +          case(0, 1)
-# +            KP(1:NP) = 9.517E-4 * L(1:NP) / D(1:NP)**4.87
-# +          case(2, 3)
-# +            KP(1:NP) = 2.12E-3 * L(1:NP) / D(1:NP)**4.87
-# +        end select
             nct = 0
             ssum = 100.0
             done = False
             converged = False
             qpredict = np.zeros(case_dom['params'].npipes)
-
-# +        NCT = 0
-# +        SSUM = 100.0
-# +        CONVERGED = .false.
-# +        DONE = .false.
 
 # The goal of this project is to reimplement the JEPPSON_CH5 code in Python,
 # not simply translate the original Fortran into Python. For this reason, pipe,
@@ -689,8 +682,8 @@ def main(args):
                 _logger.debug('Resultant flows are in units of {0:s}'
                               .format(flow_units))
 
-                print(repr(a))
-                print(repr(b))
+#                print(repr(a))
+#                print(repr(b))
 
                 # Call matrix solver
                 # Step 6. Solve matrix
@@ -704,61 +697,11 @@ def main(args):
                     converged = False
                     break
 
-                print(repr(x))
+#                print(repr(x))
 
                 _logger.debug('7. Adjust matrix')
                 if nct > 0:
                     ssum = 0.0
-
-# +L20:    do while (.not. DONE)
-# +            II = 1
-# +            do I = 1, NJ1
-# +                A(I, 1:NPP) = 0.0
-# +                NNJ = NN(I)        
-
-# +                do J = 1, NNJ
-# +                    A(I, abs(JN(I,J))) = PJDIR(I, J)
-# +                end do
-
-# +                if (IFLOW(I) /= 0) then
-# +                    A(I,NPP) = QJ(II)
-# +                    II = II + 1
-# +                end if
-# +            end do
-
-# +            do I = NJ, NP
-# +!?                A(I, 1:NPP) = 0.0
-# +                A(I, 1:NP) = 0.0
-# +                II = I - NJ1
-# +!                NNJ = LP(NPLMAX+1, II)
-# +                do J = 1, LP(NPLMAX+1, II)
-# +                    IJ = LP(J ,II)
-# +                    IIJ = abs(IJ)
-# +                    if (IJ < 0) then
-# +                        A(I, IIJ) = -KP(IIJ)
-# +                    else
-# +                        A(I, IIJ) = KP(IIJ)
-# +                    end if
-# +                end do
-# +                A(I,NPP) = 0.0
-# +            end do
-
-# +            V(1) = 4.0
-# +! System subroutine from UNIVAC MATH-PACK to solve linear system of
-# +! equations
-# +! Sperry alternate return point syntax not supported
-# +!      CALL GJR(A, 51, 50, NP, NPP, $98, JC, V)
-# +            call GJR(A, NPMAX+1, NPMAX, NP, NPP, 98, JC, V)
-
-# +            if (JC(1) /= NP) then
-# +                write(STDOUT, "('Matrix failure:', /,"                     &
-# +                    // "'JC(1): ', I3, ' <> NP: ', I3)") JC(1), NP
-# +                goto 98
-# +            end if
-
-# +            if (NCT > 0) then
-# +                SSUM = 0.0
-# +            end if
 
                 for ipipe, currpipe in enumerate(case_dom['pipe']):
                     if nct > 0:
@@ -813,8 +756,8 @@ def main(args):
                             2.0 * ugrav * case_dom['params'].kin_visc
                             * currpipe['arl'] / currpipe['idiameter']
                         )
-                        _logger.debug('  tmp_kp is in units of {0:s}'
-                                .format(tmp_kp.units))
+#                        _logger.debug('  tmp_kp is in units of {0:s}'
+#                                .format(tmp_kp.units))
                         currpipe['kp'] = tmp_kp.to('1/ft**3/s').magnitude
                         _logger.debug('  Pipe {0:d} flow in laminar region'
                                       .format(ipipe))
@@ -836,88 +779,17 @@ def main(args):
                     _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
                                   .format(ipipe, currpipe['kp']))
 
-#             do I = 1, NP
-#                 BB = A(I,NPP)
-
-#                 if (NCT > 0) then
-#                     QM = 0.5 * (Q(I) + BB)
-#                     SSUM = SSUM + abs(Q(I) - BB)
-#                 else
-#                     QM = BB
-#                 end if
-
-#                 Q(I) = QM
-#                 DELQ = QM * DELQ1
-#                 QM = abs(QM)
-#                 VE = QM / AR(I)
-
-#                 QQ(1) = QM - DELQ
-#                 QQ(2) = QM + DELQ
-
-#                 VV = QQ / AR(I)
-#                 if (VV(1) < 0.001) then
-#                     write(STDOUT, "('Note: V1 adjusted from ', ES12.4," &
-#                                   // "' to ', ES12.4)") VV(1), 0.002
-#                     VV(1) = 0.002
-#                 end if
-#                 RE = VV * D(I) / VIS
-
-# !                if (RE(2) <= 2.1E3) then
-#                 if (maxval(RE) <= 2.1E3) then
-#                     ! Laminar flow
-#                     F = f_laminar(RE)
-#                     EXPP(I) = 1.0
-# !                    KP(I) = 64.4 * VIS * ARL(I) / D(I)
-# !orig                KP(I) = 2.0 * GRAV_ES * VIS * ARL(I) / D(I)
-#                     KP(I) = G2 * VIS * ARL(I) / D(I)
-#                 else
-#                     F = f_rough(E(I), D(I))
-#                     PAR = transition_rough_metric1(F(1), E(I), VE, VIS)
-# !                    PAR = VE * sqrt(0.125 * F) * D(I) * E(I) / VIS
-#                     if (PAR > 65.0) then
-#                         ! Fully-rough-pipe flow
-#                         KP(I) = F(1) * ARL(I) * QM**2
-#                         EXPP(I) = 2.0
-#                     else
-#                         ! Newton's method root finder to calculate
-#                         ! Darcy-Weisback friction factor in transition
-#                         ! region
-
-#                         F(1) = f_transition(F(1), QQ(1), D(I), E(I),    &
-#                                             VIS, MAXMITER, MAXDIF)
-#                         F(2) = f_transition(F(1), QQ(2), D(I), E(I),    &
-#                                             VIS, MAXMITER, MAXDIF)
-
-#                         BE = (log(F(1)) - log(F(2)))                    &
-#                            / (log(QQ(1)) - log(QQ(2)))
-#                         AE = F(1) * QQ(1)**BE
-#                         EP = 1.0 - BE
-#                         EXPP(I) = 2.0 - BE
-#                         KP(I) = AE * ARL(I) * QM ** EP
-#                     end if
-#                 end if
-#             end do
-
-#             NCT = NCT + 1
-
-# ! The next three cards can be removed
-#             write(STDOUT,157) NCT, SSUM, Q(1:NP)
-#             write(STDOUT,344) EXPP(1:NP)
-#             write(STDOUT,344) KP(1:NP)
-
-#             CONVERGED = (SSUM <= TOL)
-#             DONE = (CONVERGED .or. (NCT >= MAXITER))
-#         end do L20
                 _logger.debug('Iteration {0:d}'.format(nct))
                 _logger.debug('Deviation {0:0.4E}'.format(ssum))
+
                 for ipipe, currpipe in enumerate(case_dom['pipe']):
                     _logger.debug('Pipe {0:d}: Kp = {1:0.4E}, expp = '
-                        '{2:0.4E}, Q = {3:0.4E~}'
-                        .format(ipipe,
-                                currpipe['kp'], 
-                                currpipe['expp'],
-                                Q_(qpredict[ipipe], 'm**3/s')
-                                .to('ft**3/s')))
+                                  '{2:0.4E}, Q = {3:0.4E~}'
+                                  .format(ipipe,
+                                          currpipe['kp'],
+                                          currpipe['expp'],
+                                          Q_(qpredict[ipipe], 'm**3/s')
+                                          .to('ft**3/s')))
 
                 for iflow, xflow in enumerate(x):
                     qfinal = Q_(xflow, 'm**3/s')
@@ -925,7 +797,7 @@ def main(args):
                                   '    {3:12.4E~}'
                                   .format(iflow,
                                           qfinal.to('m**3/s'),
-                                          qfinal.to('ft**3/s'), 
+                                          qfinal.to('ft**3/s'),
                                           qfinal.to('gallon/minute')))
 
                 nct += 1
@@ -937,12 +809,22 @@ def main(args):
             # End iteration
 # #######################################################################
             if not converged:
-                _logger.info('Case not converged: ssum = {0:0.4E}'
-                             .format(ssum))
+                _logger.warning('Case not converged: ssum = {0:0.4E} > '
+                                'tolerance {1:0.4E}'
+                                .format(ssum, case_dom['params'].tolerance))
 
             # Step 7. Display results
             _logger.debug('9. Display results')
 
+            for iflow, xflow in enumerate(x):
+                qfinal = Q_(xflow, 'm**3/s')
+                print('Pipe {0:d}: {1:12.4E~}    {2:12.4E~}    {3:12.4E~}'
+                      .format(iflow,
+                              qfinal.to('m**3/s'),
+                              qfinal.to('ft**3/s'),
+                              qfinal.to('gallon/minute')))
+
+            _logger.info('Done processing case')
         _logger.info('Done processing {0:s}'.format(fh.name))
     _logger.info("Ending jeppson_ch5")
 
