@@ -589,7 +589,7 @@ def main(args):
                 currpipe['eroughness'] = (
                     currpipe['froughness']
                     / currpipe['idiameter']
-                ).to_base_units()
+                ).to_base_units().magnitude
 
                 currpipe['expp'] = 0.0
                 currpipe['kp'] = kpcoeff * ld ** 4.87
@@ -646,6 +646,8 @@ def main(args):
             npipes = case_dom['params'].npipes
             njunctions = case_dom['params'].njunctions
             while not done:
+                # Step 5. Assemble matrix
+                _logger.debug('5. Assemble matrix')
                 pmap = case_dom['junc']['pipe_map']
                 b = np.zeros((npipes))
                 a = np.zeros((npipes, npipes))
@@ -691,6 +693,8 @@ def main(args):
                 print(repr(b))
 
                 # Call matrix solver
+                # Step 6. Solve matrix
+                _logger.debug('6. Solve matrix')
                 try:
                     x = np.linalg.solve(a, b)
                 except np.linalg.LinAlgError as err:
@@ -702,6 +706,7 @@ def main(args):
 
                 print(repr(x))
 
+                _logger.debug('7. Adjust matrix')
                 if nct > 0:
                     ssum = 0.0
 
@@ -710,13 +715,6 @@ def main(args):
 # +            do I = 1, NJ1
 # +                A(I, 1:NPP) = 0.0
 # +                NNJ = NN(I)        
-        
-        
-        
-        
-        
-        
-        
 
 # +                do J = 1, NNJ
 # +                    A(I, abs(JN(I,J))) = PJDIR(I, J)
@@ -764,10 +762,10 @@ def main(args):
 
                 for ipipe, currpipe in enumerate(case_dom['pipe']):
                     if nct > 0:
-                        qm = 0.5 * (qpredict[ipipe] + b[ipipe])
-                        ssum += abs(qpredict[ipipe] - b[ipipe])
+                        qm = 0.5 * (qpredict[ipipe] + x[ipipe])
+                        ssum += abs(qpredict[ipipe] - x[ipipe])
                     else:
-                        qm = b[ipipe]
+                        qm = x[ipipe]
 
                     qpredict[ipipe] = qm
                     dq = Q_(qm * case_dom['params'].fvol_flow, flow_units)
@@ -796,10 +794,10 @@ def main(args):
                                   '{1:0.4E~}'.format(ipipe, re_lo, re_hi))
 
                     friction_lo = friction_factor(
-                        Re=re_lo, eD=currpipe['eroughness'].magnitude)
+                        Re=re_lo, eD=currpipe['eroughness'])
 
                     friction_hi = friction_factor(
-                        Re=re_hi, eD=currpipe['eroughness'].magnitude)
+                        Re=re_hi, eD=currpipe['eroughness'])
 
                     _logger.debug('  Pipe {0:d} f varies from {1:0.4E~} to '
                                   '{1:0.4E~}'.format(ipipe, friction_lo,
@@ -932,6 +930,8 @@ def main(args):
 
                 nct += 1
 
+                _logger.debug('8. Check convergence')
+
                 converged = ssum <= case_dom['params'].tolerance
                 done = converged or (nct >= case_dom['params'].maxiter)
             # End iteration
@@ -940,13 +940,8 @@ def main(args):
                 _logger.info('Case not converged: ssum = {0:0.4E}'
                              .format(ssum))
 
-
-            # Step 5. Assemble matrix
-            _logger.debug('5. Assemble matrix')
-            # Step 6. Solve matrix
-            _logger.debug('6. Solve matrix')
             # Step 7. Display results
-            _logger.debug('7. Display results')
+            _logger.debug('9. Display results')
 
         _logger.info('Done processing {0:s}'.format(fh.name))
     _logger.info("Ending jeppson_ch5")
