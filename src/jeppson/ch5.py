@@ -243,9 +243,7 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
     }
 
     results = {
-        'status': 'unknown',
-        'msg': 'Pipe info results not initialized',
-        'iread': 3 * npipecards,
+        '_iread': 3 * npipecards,
         'pipe_info': []
     }
 
@@ -260,7 +258,21 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         for tok in deck[ifroughctr].token:
             tmppipe['froughness'].append(Q_(float(tok), inunit['froughness']))
 
-    _logger.debug('Model contains {0:d} pipes:'.format(npipes))
+    ndiam = len(tmppipe['idiameter'])
+    nlpipe = len(tmppipe['lpipe'])
+    nrough = len(tmppipe['froughness'])
+
+    if ndiam != nlpipe or ndiam != nrough:
+        raise ValueError('Mismatched number of pipe attributes: {0:d} '
+                         'diameters, {1:d} lengths, {2:d} roughnesses - all '
+                         'should be equal'.format(ndiam, nlpipe, nrough))
+    elif ndiam != npipes:
+        raise ValueError('{0:d} of each pipe attribute found, {1:d} expected'
+                         .format(ndiam, npipes))
+    else:
+        _logger.debug('Model contains {0:d} pipes ({1:d} expected):'
+                      .format(ndiam, npipes))
+
     for ict in range(npipes):
         results['pipe_info'].append({'id': ict,
                                      'idiameter': tmppipe['idiameter'][ict],
@@ -272,9 +284,6 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
                               currpipe['idiameter'],
                               currpipe['lpipe'],
                               currpipe['froughness']))
-    results['status'] = 'ok'
-    results['message'] = 'Read diameter, length and roughness ' \
-                         'for {:d} pipes'.format(npipes)
 
     return results
 
@@ -508,7 +517,7 @@ def extract_case(iptr, deck):
 
     case_dom['pipe'] = pipe_info['pipe_info']
 
-    iptr += pipe_info['iread']
+    iptr += pipe_info['_iread']
 
     # Step 3. Read junction data
     _logger.debug('3. Reading junction inflows and pipe network '
