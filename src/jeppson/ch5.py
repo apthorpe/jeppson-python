@@ -816,13 +816,48 @@ def main(args):
             # Step 7. Display results
             _logger.debug('9. Display results')
 
+#138 format(' HEAD LOSSES IN PIPES'/,(' ', 13F10.3))
+#107 format('O FLOWRATES IN PIPES IN FT**3/SEC', /,                      &
+#           (' ', 13F10.3))
+#105 format(' FLOW RATES (GPM)', /, (' ',13F10.1))
+#127 format('O FLOWRATES IN PIPES IN M**3/SEC', /,                       &
+#           (' ', 13E10.4))
+#        select case(NUNIT)
+#          case(0, 1)
+#            ! Flow in cfs
+#            write(STDOUT, 107) Q(1:NP)
+#            KP(1:NP) = KP(1:NP) * abs(Q(1:NP))
+#            Q(1:NP) = GPM_PER_CFS * Q(1:NP)
+
+#            write(STDOUT,138) KP(1:NP)
+
+#            write(STDOUT,105) Q(1:NP)
+
+#            cycle L30
+#          case(2, 3)
+#            write(STDOUT,127) Q(1:NP)
+
+#            KP(1:NP) = KP(1:NP) * abs(Q(1:NP))
+
+#            write(STDOUT, 138) KP(1:NP)
+#        end select
+
+            print('Pipe  Flow                     Flow'
+                  '                      Flow'
+                  '                    Head Loss'
+                  '        Head Loss')
             for iflow, xflow in enumerate(x):
                 qfinal = Q_(xflow, 'm**3/s')
-                print('Pipe {0:d}: {1:12.4E~}    {2:12.4E~}    {3:12.4E~}'
+                hlfinal = Q_(case_dom['pipe'][iflow]['kp']
+                             * qfinal.to('ft**3/s').magnitude, 'ft')
+                print('{0:-3d}   {1:12.4E~}    {2:12.4E~}    {3:12.4E~}    '
+                      '{4:12.4E~}    {5:12.4E~}'
                       .format(iflow,
                               qfinal.to('m**3/s'),
                               qfinal.to('ft**3/s'),
-                              qfinal.to('gallon/minute')))
+                              qfinal.to('gallon/minute'),
+                              hlfinal.to('ft'),
+                              hlfinal.to('m')))
 
             _logger.info('Done processing case')
         _logger.info('Done processing {0:s}'.format(fh.name))
