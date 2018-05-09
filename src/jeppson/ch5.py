@@ -579,8 +579,13 @@ def main(args):
 #        ! Calculate loss coefficient KP based on length and diameter
 #        ! unit of measure
 
-            # Note: Use SI coefficient since base units are SI (mks)
-            kpcoeff = 2.12E-3
+#            # Note: Use SI coefficient since base units are SI (mks)
+#            kpcoeff = 2.12E-3
+
+            # Note: Use US coefficient since dP/dQ calculations are done using
+            # Q in ft**3/s
+            kpcoeff = 9.517E-4
+
 #            unitcode = case_dom['params'].unitcode
 #            if unitcode in (0, 1):
 #                # Coefficient for traditional (US) units
@@ -592,6 +597,7 @@ def main(args):
 #                raise ValueError('Unknown unit code {0:d}, expected (0..3)'
 #                                 .format(unitcode))
 
+            print('Pipe    Diameter         Length           Rel. Roughness')
             for currpipe in case_dom['pipe']:
                 ld = (currpipe['lpipe'] / currpipe['idiameter']
                       ).to_base_units().magnitude
@@ -614,6 +620,11 @@ def main(args):
                               .format(currpipe['id'],
                                       currpipe['kp'],
                                       currpipe['flow_area']))
+
+                print('{0:3d}     {1:12.4E~}    {2:12.4E~}  {3:12.4E}'
+                      .format(currpipe['id'], currpipe['idiameter'],
+                              currpipe['lpipe'], currpipe['eroughness']))
+            print()
 
             nct = 0
             ssum = 100.0
@@ -765,8 +776,6 @@ def main(args):
                             2.0 * ugrav * case_dom['params']['kin_visc']
                             * currpipe['arl'] / currpipe['idiameter']
                         )
-#                        _logger.debug('  tmp_kp is in units of {0:s}'
-#                                .format(tmp_kp.units))
                         currpipe['kp'] = tmp_kp.to('1/ft**3/s').magnitude
                         _logger.debug('  Pipe {0:d} flow in laminar region'
                                       .format(ipipe))
@@ -785,29 +794,33 @@ def main(args):
                                       .format(currpipe['arl'].units))
                         _logger.debug('  Pipe {0:d} flow in transition / '
                                       'turbulent region'.format(ipipe))
+
                     _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
                                   .format(ipipe, currpipe['kp']))
 
-                _logger.debug('Iteration {0:d}'.format(nct))
-                _logger.debug('Deviation {0:0.4E}'.format(ssum))
-
+                print('Iteration {0:d}'.format(nct))
+                print('Deviation {0:0.4E}'.format(ssum))
+                print()
+                print('Pipe   Kp            expp          '
+                      'Qcurrent                  Qpredict')
                 for ipipe, currpipe in enumerate(case_dom['pipe']):
-                    _logger.debug('Pipe {0:d}: Kp = {1:0.4E}, expp = '
-                                  '{2:0.4E}, Q = {3:0.4E~}'
-                                  .format(ipipe,
-                                          currpipe['kp'],
-                                          currpipe['expp'],
-                                          Q_(qpredict[ipipe], 'm**3/s')
-                                          .to('ft**3/s')))
+                    print('{0:3d}    {1:0.4E}    {2:0.4E}    '
+                          '{3:0.4E~}    {4:0.4E~}'
+                          .format(ipipe,
+                                  currpipe['kp'],
+                                  currpipe['expp'],
+                                  Q_(x[ipipe], 'm**3/s').to('ft**3/s'),
+                                  Q_(qpredict[ipipe], 'm**3/s').to('ft**3/s')))
+                print()
 
-                for iflow, xflow in enumerate(x):
-                    qfinal = Q_(xflow, 'm**3/s')
-                    _logger.debug('Pipe {0:d}: {1:12.4E~}    {2:12.4E~}'
-                                  '    {3:12.4E~}'
-                                  .format(iflow,
-                                          qfinal.to('m**3/s'),
-                                          qfinal.to('ft**3/s'),
-                                          qfinal.to('gallon/minute')))
+#                for iflow, xflow in enumerate(x):
+#                    qfinal = Q_(xflow, 'm**3/s')
+#                    _logger.debug('Pipe {0:d}: {1:12.4E~}    {2:12.4E~}'
+#                                  '    {3:12.4E~}'
+#                                  .format(iflow,
+#                                          qfinal.to('m**3/s'),
+#                                          qfinal.to('ft**3/s'),
+#                                          qfinal.to('gallon/minute')))
 
                 nct += 1
 
@@ -830,7 +843,7 @@ def main(args):
             print('Pipe  Flow                     Flow'
                   '                      Flow'
                   '                    Head Loss'
-                  '        Head Loss')
+                  '       Head Loss')
             for iflow, xflow in enumerate(x):
                 qfinal = Q_(xflow, 'm**3/s')
                 hlfinal = Q_(case_dom['pipe'][iflow]['kp']
@@ -841,8 +854,8 @@ def main(args):
                               qfinal.to('m**3/s'),
                               qfinal.to('ft**3/s'),
                               qfinal.to('gallon/minute'),
-                              hlfinal.to('ft'),
-                              hlfinal.to('m')))
+                              hlfinal.to('m'),
+                              hlfinal.to('ft')))
 
             _logger.info('Done processing case')
         _logger.info('Done processing {0:s}'.format(fh.name))
