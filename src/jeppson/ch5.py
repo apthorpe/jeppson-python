@@ -441,6 +441,7 @@ def extract_case(iptr, deck):
 
     _logger.debug('Found {0:d} of {1:d} pipes defined in {2:d} lines'
                   .format(pipect, npipes, npipecards))
+
     # Step 2. Read pipe data
     _logger.debug('2. Reading pipe data')
     unitcode = case_dom['params']['unitcode']
@@ -455,7 +456,16 @@ def extract_case(iptr, deck):
     njunctions = case_dom['params']['njunctions']
     pipemap_info = extract_junctions(deck, iptr, njunctions, npipes)
 
-    case_dom['junc'] = pipemap_info['junc_info']
+    # TODO: Remove dependency on case_dom['junc']
+#    case_dom['junc'] = pipemap_info['junc_info']
+
+    # Migrate case_dom['junc']['pipe_map'] info into case_dom['pipe']
+    for pmap in pipemap_info['junc_info']['pipe_map']:
+        pipe_id = pmap['id']
+        case_dom['pipe'][pipe_id]['to'] = pmap['to']
+        case_dom['pipe'][pipe_id]['from'] = pmap['from']
+
+    case_dom['inflows'] = pipemap_info['junc_info']['inflows']
 
     iptr += pipemap_info['_iread']
 
@@ -467,6 +477,7 @@ def extract_case(iptr, deck):
     case_dom['loop'] = pipeloop_info['loop_info']
 
     iptr += pipeloop_info['_iread']
+
     # Done reading input; assert (iptr + iread - 1) == len(deck) for a
     # single case
     case_dom['next_iptr'] = iptr
@@ -584,7 +595,7 @@ def create_topology_dotfile(case_dom, filepath='tmp.gv'):
 
     G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
 
-    for idx, inflow in enumerate(case_dom['junc']['inflows']):
+    for idx, inflow in enumerate(case_dom['inflows']):
         jtag = jfmt.format(idx)
         jxtag = jxfmt.format(idx)
         G.add_node(jtag, shape='circle', label=jtag)
@@ -597,8 +608,8 @@ def create_topology_dotfile(case_dom, filepath='tmp.gv'):
             G.add_edge(jtag, jxfmt.format(idx), color='red',
                        label='{:0.1f~}'.format(abs(inflow)))
 
-    for idx, link in enumerate(case_dom['junc']['pipe_map']):
-        pqtag = pqfmt.format(idx, case_dom['pipe'][idx]['vol_flow'])
+    for idx, link in enumerate(case_dom['pipe']):
+        pqtag = pqfmt.format(idx, link['vol_flow'])
         jfrom = jfmt.format(link['from'])
         jto = jfmt.format(link['to'])
         G.add_edge(jfrom, jto, label=pqtag)
@@ -704,10 +715,10 @@ def main(args):
 
             a = np.zeros((npipes, npipes))
             # This portion of the A matrix is constant
-            for pipespan in case_dom['junc']['pipe_map']:
-                pipe_id = pipespan['id']
-                jfrom = pipespan['from']
-                jto = pipespan['to']
+            for pipe in case_dom['pipe']:
+                pipe_id = pipe['id']
+                jfrom = pipe['from']
+                jto = pipe['to']
                 _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
                               .format(pipe_id, jfrom, jto))
                 if jfrom < njunctions - 1:
@@ -717,7 +728,7 @@ def main(args):
 
             # The B vector is constant
             b = np.zeros((npipes))
-            for idx, inflow in enumerate(case_dom['junc']['inflows']):
+            for idx, inflow in enumerate(case_dom['inflows']):
                 # Use base units of first non-zero flow for result
                 # conversion.
                 if flow_units == '' and inflow.magnitude != 0.0:
@@ -844,6 +855,7 @@ def main(args):
                     _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
                                   .format(ipipe, currpipe['kp']))
 
+                _logger.debug('8. Display interim results')
                 print('Iteration {0:d}'.format(nct))
                 print('Deviation {0:0.4E}'.format(ssum))
                 print()
@@ -870,12 +882,11 @@ def main(args):
 
                 nct += 1
 
-                _logger.debug('8. Check convergence')
+                _logger.debug('9. Check convergence')
 
                 converged = ssum <= case_dom['params']['tolerance']
                 done = converged or (nct >= case_dom['params']['maxiter'])
 
-                _logger.debug('9. Display interim results')
             # End iteration
 # #######################################################################
             if not converged:
@@ -883,28 +894,33 @@ def main(args):
                                 'tolerance {1:0.4E}'
                                 .format(ssum, case_dom['params']['tolerance']))
 
-            # Step 7. Display results
-            _logger.debug('10. Display final results')
-
             flow_disp_units = 'm**3/s'
-            for qext in case_dom['junc']['inflows']:
+            for qext in case_dom['inflows']:
                 if qext != 0.0:
                     flow_disp_units = qext.units
                     break
+
+            for ipipe in range(npipes):
+                case_dom['pipe'][ipipe]['vol_flow'] = (
+                    Q_(x[ipipe], 'm**3/s').to(flow_disp_units))
+                case_dom['pipe'][ipipe]['head_loss'] = (
+                    Q_(case_dom['pipe'][ipipe]['kp']
+                    * case_dom['pipe'][ipipe]['vol_flow']
+                      .to('ft**3/s').magnitude, 'ft'))
+
+            # Step 10. Display results
+            _logger.debug('10. Display final results')
 
             print('Pipe  Flow                     Flow'
                   '                      Flow'
                   '                    Head Loss'
                   '       Head Loss')
-            for iflow, xflow in enumerate(x):
-                qfinal = Q_(xflow, 'm**3/s')
-                case_dom['pipe'][iflow]['vol_flow'] = \
-                    qfinal.to(flow_disp_units)
-                hlfinal = Q_(case_dom['pipe'][iflow]['kp']
-                             * qfinal.to('ft**3/s').magnitude, 'ft')
+            for ipipe in range(npipes):
+                qfinal = case_dom['pipe'][ipipe]['vol_flow']
+                hlfinal = case_dom['pipe'][ipipe]['head_loss']
                 print('{0:-3d}   {1:12.4E~}    {2:12.4E~}    {3:12.4E~}    '
                       '{4:12.4E~}    {5:12.4E~}'
-                      .format(iflow,
+                      .format(ipipe,
                               qfinal.to('m**3/s'),
                               qfinal.to('ft**3/s'),
                               qfinal.to('gallon/minute'),
@@ -914,7 +930,9 @@ def main(args):
             dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
             create_topology_dotfile(case_dom, dotfn)
 
-            _logger.info('Done processing case')
+            print(repr(case_dom))
+
+            _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))
     _logger.info("Ending jeppson_ch5")
 

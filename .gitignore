@@ -43,3 +43,4 @@ MANIFEST
 
 # Extras
 .pytest_cache/
+_vault
