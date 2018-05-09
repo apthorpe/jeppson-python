@@ -237,7 +237,7 @@ def extract_junctions(deck, iptr, njunctions, npipes):
 
     Raises:
         ValueError: Pipe ID out of range (<1) or junction flow unit specifier
-        out of range (not in [0..3])
+          out of range (not in [0..3])
     """
 
     flow_inputconv = [
@@ -360,12 +360,9 @@ def extract_loops(deck, iptr, nloops):
     """
 
     results = {
-        'status': 'unknown',
-        'msg': 'Pipe loop results not initialized',
-        'iread': 0,
-        'loop_info': {}
+        '_iread': 0,
+        'loop_info': []
     }
-    LoopElement = namedtuple("LoopElement", ['pipe_id', 'flow_dir'])
 
     iloop = 0
     iread = 0
@@ -374,32 +371,25 @@ def extract_loops(deck, iptr, nloops):
         _logger.debug('Processing {0:s}'.format(deck[jptr].as_log()))
         nlooppipe = int(deck[jptr].token[0])
         assert nlooppipe == deck[jptr].ntok - 1
-        results['loop_info'][iloop] = []
+        results['loop_info'].append([])
         for ipos in range(nlooppipe):
             pipe_read_id = int(deck[jptr].token[1+ipos])
             flow_conv = copysign(1.0, pipe_read_id)
             pipe_read_id = abs(pipe_read_id)
             pipe_stored_id = pipe_read_id - 1
-            looppart = LoopElement(pipe_stored_id, flow_conv)
-            results['loop_info'][iloop].append(looppart)
+            results['loop_info'][iloop].append(
+                {'pipe_id': pipe_stored_id, 'flow_dir': flow_conv})
             if pipe_read_id == 0:
                 msg = 'Element {0:d} of loop {1:d} has an invalid pipe id ' \
                       '(0)'.format(ipos+1, iloop+1)
                 _logger.error(msg)
-                results['status'] = 'error'
-                results['msg'] = msg
                 raise ValueError(msg)
 
         iread += 1
         iloop += 1
         jptr += 1
 
-    results['iread'] = iread
-    if results['status'] == 'unknown':
-        results['status'] = 'ok'
-        results['msg'] = '{0:d} loops have been read'.format(iloop)
-
-    _logger.debug(results['status'] + ': ' + results['msg'])
+    results['_iread'] = iread
 
     assert nloops == iloop
 
@@ -408,13 +398,13 @@ def extract_loops(deck, iptr, nloops):
         _logger.debug('Loop {0:d} contains {1:d} elements:'
                       .format(idx, nparts))
         for jdx in range(nparts):
-            if results['loop_info'][idx][jdx].flow_dir > 0.0:
+            if results['loop_info'][idx][jdx]['flow_dir'] > 0.0:
                 flow_dir = 'clockwise (forward)'
             else:
                 flow_dir = 'counter-clockwise (reverse)'
             _logger.debug('  Element {0:d} is pipe {1:d}, flow is {2:s}'
                           .format(jdx+1,
-                                  results['loop_info'][idx][jdx].pipe_id,
+                                  results['loop_info'][idx][jdx]['pipe_id'],
                                   flow_dir))
 
     return results
@@ -474,7 +464,7 @@ def extract_case(iptr, deck):
 
     case_dom['loop'] = pipeloop_info['loop_info']
 
-    iptr += pipeloop_info['iread']
+    iptr += pipeloop_info['_iread']
     # Done reading input; assert (iptr + iread - 1) == len(deck) for a
     # single case
     case_dom['next_iptr'] = iptr
@@ -697,15 +687,16 @@ def main(args):
             while not done:
                 # Step 5. Assemble matrix
                 _logger.debug('5b. Assemble matrix rows of loop equations')
-                for iloop in case_dom['loop']:
+                for iloop, looppipe in enumerate(case_dom['loop']):
                     row_id = njunctions - 1 + iloop
                     _logger.debug('Row id is {0:d} = njunctions + iloop = '
                                   '{1:d} + {2:d}'.format(row_id, njunctions,
                                                          iloop))
-                    for pipe in case_dom['loop'][iloop]:
-                        col_id = pipe.pipe_id
-                        resistance = (pipe.flow_dir
-                                      * case_dom['pipe'][pipe.pipe_id]['kp'])
+                    for pipe in looppipe:
+                        pid = pipe['pipe_id']
+                        col_id = pid
+                        resistance = (pipe['flow_dir']
+                                      * case_dom['pipe'][pid]['kp'])
                         _logger.debug('  Col id is {0:d}; resistance = '
                                       '{1:0.4E}'.format(col_id, resistance))
                         a[row_id, col_id] = resistance
