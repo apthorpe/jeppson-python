@@ -34,73 +34,6 @@ __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
-Nomenclature = namedtuple('Nomenclature',
-                          ['tag', 'description', 'mks_units', 'us_units'])
-
-idataprop = OrderedDict([
-    ('vol_flow',   Nomenclature('vol_flow',
-                                'volumetric flowrate',
-                                ureg.meter**3 / ureg.second,
-                                ureg.foot**3 / ureg.second)),
-    ('idiameter',  Nomenclature('idiameter',
-                                'pipe inner diameter',
-                                ureg.meter,
-                                ureg.foot)),
-    ('lpipe',      Nomenclature('lpipe',
-                                'pipe length',
-                                ureg.meter,
-                                ureg.foot)),
-    ('froughness', Nomenclature('froughness',
-                                'absolute pipe roughness',
-                                ureg.meter,
-                                ureg.foot)),
-    ('fvol_flow',  Nomenclature('fvol_flow',
-                                'fractional volumetric flow',
-                                ureg.parse_expression('dimensionless'),
-                                ureg.parse_expression('dimensionless'))),
-    ('kin_visc',   Nomenclature('kin_visc',
-                                'kinematic viscosity',
-                                ureg.meter**2 / ureg.second,
-                                ureg.foot**2 / ureg.second)),
-    ('flow_area',  Nomenclature('flow_area',
-                                'pipe flow area',
-                                ureg.meter**2,
-                                ureg.foot**2)),
-    ('arl',        Nomenclature('arl',
-                                'power law model constant term',
-                                ureg.second**2 / ureg.meter**5,
-                                ureg.second**2 / ureg.feet**5
-                                )),
-    ('dvol_flow',  Nomenclature('dvol_flow',
-                                'volumentric flowrate deviation',
-                                ureg.meter**3 / ureg.second,
-                                ureg.foot**3 / ureg.second)),
-    ('eroughness', Nomenclature('eroughness',
-                                'relative pipe roughness',
-                                ureg.parse_expression('dimensionless'),
-                                ureg.parse_expression('dimensionless'))),
-    ('friction',   Nomenclature('friction',
-                                'darcy-weisback friction factor',
-                                ureg.parse_expression('dimensionless'),
-                                ureg.parse_expression('dimensionless')))
-])
-
-ugrav = Q_(sc.g, 'm/s**2')
-
-pipe_inputconv = [
-    {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
-    {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
-    {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
-    {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
-]
-
-flow_inputconv = [
-    'skip',
-    'gallon / minute',
-    'ft**3 / sec',
-    'm**3 / sec'
-]
-
 
 def parse_args(args):
     """Parse command line parameters
@@ -231,8 +164,14 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
         unitcode (int): Code from input file selecting pipe dimension units
 
     Returns:
-        (list): iList of dicts containing pipe dimensions
+        (list): List of dicts containing pipe dimensions
     """
+    pipe_inputconv = [
+        {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
+        {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
+        {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
+        {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
+    ]
 
     inunit = pipe_inputconv[unitcode]
 
@@ -300,7 +239,14 @@ def extract_junctions(deck, iptr, njunctions, npipes):
         ValueError: Pipe ID out of range (<1) or junction flow unit specifier
         out of range (not in [0..3])
     """
-#    PipeRoute = namedtuple('PipeRoute', ['pipe_id', 'from', 'to', 'inflow'])
+
+    flow_inputconv = [
+        'skip',
+        'gallon / minute',
+        'ft**3 / sec',
+        'm**3 / sec'
+    ]
+
     results = {
         '_iread': 0,
         'junc_info': {
@@ -365,7 +311,7 @@ def extract_junctions(deck, iptr, njunctions, npipes):
             _logger.debug('Processing junction {0:d} inflow: {1:s}'
                           .format(junc_id, deck[jptr].as_log()))
             ji['inflows'][junc_id] = Q_(float(deck[jptr].token[0]),
-                                     flow_inputconv[inflow_units])
+                                        flow_inputconv[inflow_units])
             _logger.debug('Inflow of {0:0.4E~}'
                           .format(ji['inflows'][junc_id]))
         else:
@@ -543,6 +489,7 @@ def set_pipe_derived_properties(pipelist):
     Args:
         pipelist ([dicr]): List of dicts containing pipe dimensions and
           attributes"""
+    ugrav = Q_(sc.g, 'm/s**2')
 
     for currpipe in pipelist:
         currpipe['LD'] = (
@@ -563,13 +510,26 @@ def set_pipe_derived_properties(pipelist):
             / currpipe['idiameter']
         ).to_base_units().magnitude
 
-#        # Note: Use SI coefficient since base units are SI (mks)
-#        kpcoeff = 2.12E-3
+        # For the initial pass, the value of kpcoeff should not matter.
+        # kpcoeff is a constant multiplier on all non-zero terms in each loop
+        # equation. Loop equations are homogeneous (B[iloop] = 0) so the
+        # results are only affected by the (L/D) exponential term for each
+        # pipe; only the relative magnitudes of the coefficient in the loop
+        # equations determine the calculated flows.
 
+        # Later iterations of the solver loop use laminar or turbulent
+        # correlations to calculate kp; kpcoeff is not used after this point.
+
+# Method 1:
+#        # Note: Use SI coefficient since base units are SI (mks)
+#        kpcoeff = 2.12E-3.
+
+# Method 2:
         # Note: Use US coefficient since dP/dQ calculations are done using
         # Q in ft**3/s
         kpcoeff = 9.517E-4
 
+# Method 3:
 #        unitcode = case_dom['params'].unitcode
 #        if unitcode in (0, 1):
 #            # Coefficient for traditional (US) units
@@ -625,6 +585,8 @@ def main(args):
     Args:
         args ([str]): command line parameter list
     """
+    ugrav = Q_(sc.g, 'm/s**2')
+
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.info("Starting jeppson_ch5")
@@ -707,7 +669,7 @@ def main(args):
                           'vector')
 
             a = np.zeros((npipes, npipes))
-            # This portion of the A matrix is constant 
+            # This portion of the A matrix is constant
             for pipespan in case_dom['junc']['pipe_map']:
                 pipe_id = pipespan['id']
                 jfrom = pipespan['from']
@@ -719,7 +681,7 @@ def main(args):
                 if jto < njunctions - 1:
                     a[jto, pipe_id] = 1.0
 
-            # The B vector is constant 
+            # The B vector is constant
             b = np.zeros((npipes))
             for idx, inflow in enumerate(case_dom['junc']['inflows']):
                 # Use base units of first non-zero flow for result
