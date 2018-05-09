@@ -17,6 +17,7 @@ import argparse
 from collections import namedtuple, OrderedDict
 import logging
 from math import copysign, log, nan
+from os.path import abspath, splitext
 import sys
 
 # import iapws
@@ -24,6 +25,7 @@ import scipy.constants as sc
 # from fluids.core import Reynolds
 from fluids.friction import friction_factor
 import numpy as np
+import pygraphviz as pgv
 
 from . import _logger, ureg, Q_
 # from jeppson.pipe import Pipe
@@ -569,6 +571,48 @@ def pipe_dimension_table(pipelist):
     return result
 
 
+def create_topology_dotfile(case_dom, filepath='tmp.gv'):
+    """Create directed graph in GraphViz ``dot`` format
+    
+    Args:
+        case_dom (dict): Pipe network object model
+        filepath (str): Absolute path of dotfile"""
+    jfmt = 'J{:d}'
+    jxfmt = 'JX{:d}'
+    pfmt = 'P{:d}'
+    pqfmt = 'P{:d}: {:0.1f~}'
+
+    G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
+
+    for idx, inflow in enumerate(case_dom['junc']['inflows']):
+        jtag = jfmt.format(idx)
+        jxtag = jxfmt.format(idx)
+        G.add_node(jtag, shape='circle', label=jtag)
+        if inflow.magnitude > 0.0:
+            G.add_node(jxtag, shape='none', label='')
+            G.add_edge(jxfmt.format(idx), jtag, color='blue',
+                       label='{:0.1f~}'.format(inflow))
+        elif inflow.magnitude < 0.0:
+            G.add_node(jxtag, shape='none', label='')
+            G.add_edge(jtag, jxfmt.format(idx), color='red',
+                       label='{:0.1f~}'.format(abs(inflow)))
+
+    for idx, link in enumerate(case_dom['junc']['pipe_map']):
+        pqtag = pqfmt.format(idx, case_dom['pipe'][idx]['vol_flow'])
+        jfrom = jfmt.format(link['from'])
+        jto = jfmt.format(link['to'])
+        G.add_edge(jfrom, jto, label=pqtag)
+
+    dotfn = abspath(filepath)
+    basepath, ext = splitext(dotfn)
+    pngpath = abspath(basepath + '.png')
+    _logger.debug('Writing png to {:s}'.format(pngpath))
+    G.write(dotfn)
+    G.draw(path=pngpath, prog='dot')
+
+    return
+
+
 def main(args):
     """Main entry point allowing external calls
 
@@ -842,12 +886,20 @@ def main(args):
             # Step 7. Display results
             _logger.debug('10. Display final results')
 
+            flow_disp_units = 'm**3/s'
+            for qext in case_dom['junc']['inflows']:
+                if qext != 0.0:
+                    flow_disp_units = qext.units
+                    break
+
             print('Pipe  Flow                     Flow'
                   '                      Flow'
                   '                    Head Loss'
                   '       Head Loss')
             for iflow, xflow in enumerate(x):
                 qfinal = Q_(xflow, 'm**3/s')
+                case_dom['pipe'][iflow]['vol_flow'] = \
+                    qfinal.to(flow_disp_units)
                 hlfinal = Q_(case_dom['pipe'][iflow]['kp']
                              * qfinal.to('ft**3/s').magnitude, 'ft')
                 print('{0:-3d}   {1:12.4E~}    {2:12.4E~}    {3:12.4E~}    '
@@ -858,6 +910,9 @@ def main(args):
                               qfinal.to('gallon/minute'),
                               hlfinal.to('m'),
                               hlfinal.to('ft')))
+
+            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
+            create_topology_dotfile(case_dom, dotfn)
 
             _logger.info('Done processing case')
         _logger.info('Done processing {0:s}'.format(fh.name))
