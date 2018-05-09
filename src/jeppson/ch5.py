@@ -536,6 +536,89 @@ def extract_case(iptr, deck):
     return case_dom
 
 
+def set_pipe_derived_properties(pipelist):
+    """Set derived properties of pipe - flow area, arl, eroughness, and initial
+    kp and expp
+
+    Args:
+        pipelist ([dicr]): List of dicts containing pipe dimensions and
+          attributes"""
+
+    for currpipe in pipelist:
+        currpipe['LD'] = (
+            currpipe['lpipe'] / currpipe['idiameter']
+        ).to_base_units().magnitude
+
+        currpipe['flow_area'] = (
+            sc.pi / 4.0 * currpipe['idiameter']**2
+        ).to_base_units()
+
+        currpipe['arl'] = (
+            currpipe['lpipe'] / (2.0 * ugrav * currpipe['idiameter']
+                                 * currpipe['flow_area']**2)
+        ).to_base_units()
+
+        currpipe['eroughness'] = (
+            currpipe['froughness']
+            / currpipe['idiameter']
+        ).to_base_units().magnitude
+
+#        # Note: Use SI coefficient since base units are SI (mks)
+#        kpcoeff = 2.12E-3
+
+        # Note: Use US coefficient since dP/dQ calculations are done using
+        # Q in ft**3/s
+        kpcoeff = 9.517E-4
+
+#        unitcode = case_dom['params'].unitcode
+#        if unitcode in (0, 1):
+#            # Coefficient for traditional (US) units
+#            kpcoeff = 9.517E-4
+#        elif unitcode in (2, 3):
+#            # Coefficient for mks (SI) units
+#            kpcoeff = 2.12E-3
+#        else:
+#            raise ValueError('Unknown unit code {0:d}, expected (0..3)'
+#                             .format(unitcode))
+
+        currpipe['expp'] = 0.0
+        currpipe['kp'] = kpcoeff * currpipe['LD'] ** 4.87
+
+        _logger.debug('Pipe {:d}: '
+                      'Aflow = {:0.4E~}, '
+                      'arl = {:0.4E~}, '
+                      'eD = {:0.4E}, '
+                      'LD = {:0.4E}, '
+                      'Kp = {:0.4E}, '
+                      'expp = {:0.4E}'
+                      .format(currpipe['id'],
+                              currpipe['flow_area'],
+                              currpipe['arl'],
+                              currpipe['eroughness'],
+                              currpipe['LD'],
+                              currpipe['kp'],
+                              currpipe['expp']))
+
+    return
+
+
+def pipe_dimension_table(pipelist):
+    """Print pipe dimensions in a tabular text format
+
+    Args:
+        pipelist ([dict]): List of dicts containing pipe data
+
+    Returns:
+        (str): Text table of pipe dimensions"""
+
+    result = 'Pipe    Diameter         Length           Rel. Roughness\n'
+    for currpipe in pipelist:
+        result += '{0:3d}     {1:12.4E~}    {2:12.4E~}  {3:12.4E}\n' \
+                  .format(currpipe['id'], currpipe['idiameter'],
+                          currpipe['lpipe'], currpipe['eroughness'])
+    return result
+
+
 def main(args):
     """Main entry point allowing external calls
 
@@ -575,63 +658,13 @@ def main(args):
                 _logger.notice('Advancing to next file.')
                 break
 
-# #######################################################################
-#        ! Calculate loss coefficient KP based on length and diameter
-#        ! unit of measure
+            set_pipe_derived_properties(case_dom['pipe'])
 
-#            # Note: Use SI coefficient since base units are SI (mks)
-#            kpcoeff = 2.12E-3
-
-            # Note: Use US coefficient since dP/dQ calculations are done using
-            # Q in ft**3/s
-            kpcoeff = 9.517E-4
-
-#            unitcode = case_dom['params'].unitcode
-#            if unitcode in (0, 1):
-#                # Coefficient for traditional (US) units
-#                kpcoeff = 9.517E-4
-#            elif unitcode in (2, 3):
-#                # Coefficient for mks (SI) units
-#                kpcoeff = 2.12E-3
-#            else:
-#                raise ValueError('Unknown unit code {0:d}, expected (0..3)'
-#                                 .format(unitcode))
-
-            print('Pipe    Diameter         Length           Rel. Roughness')
-            for currpipe in case_dom['pipe']:
-                ld = (currpipe['lpipe'] / currpipe['idiameter']
-                      ).to_base_units().magnitude
-                currpipe['flow_area'] = (
-                    sc.pi / 4.0 * currpipe['idiameter']**2).to_base_units()
-                currpipe['arl'] = (
-                    currpipe['lpipe'] / (2.0 * ugrav * currpipe['idiameter']
-                                         * currpipe['flow_area']**2)
-                ).to_base_units()
-#                _logger.debug('ARL is in {0:s}'.format(currpipe['arl'].units))
-                currpipe['eroughness'] = (
-                    currpipe['froughness']
-                    / currpipe['idiameter']
-                ).to_base_units().magnitude
-
-                currpipe['expp'] = 0.0
-                currpipe['kp'] = kpcoeff * ld ** 4.87
-
-                _logger.debug('Pipe {0:d}: Kp = {1:0.4E}, Aflow = {2:0.4E~}'
-                              .format(currpipe['id'],
-                                      currpipe['kp'],
-                                      currpipe['flow_area']))
-
-                print('{0:3d}     {1:12.4E~}    {2:12.4E~}  {3:12.4E}'
-                      .format(currpipe['id'], currpipe['idiameter'],
-                              currpipe['lpipe'], currpipe['eroughness']))
+            print(pipe_dimension_table(case_dom['pipe']))
             print()
 
-            nct = 0
-            ssum = 100.0
-            done = False
-            converged = False
-            npipes = case_dom['params']['npipes']
-            qpredict = np.zeros(npipes)
+# #######################################################################
+
 
 # The goal of this project is to reimplement the JEPPSON_CH5 code in Python,
 # not simply translate the original Fortran into Python. For this reason, pipe,
@@ -659,33 +692,49 @@ def main(args):
 # corresponding entries in the b column vector are zero since the flow around a
 # loop is conservative - no net increase or decrease.
 
-            b = np.zeros((npipes))
-            a = np.zeros((npipes, npipes))
+            nct = 0
+            ssum = 100.0
             flow_units = ''
+            npipes = case_dom['params']['npipes']
             njunctions = case_dom['params']['njunctions']
+            qpredict = np.zeros(npipes)
+
+            # Set (njunctions-1) independent, conservative junction equations.
+            # Note that the remaining junction equation can be derived from the
+            # junction equations specified so far.
+
+            _logger.debug('5a. Assemble constant portions of matrix and RHS '
+                          'vector')
+
+            a = np.zeros((npipes, npipes))
+            # This portion of the A matrix is constant 
+            for pipespan in case_dom['junc']['pipe_map']:
+                pipe_id = pipespan['id']
+                jfrom = pipespan['from']
+                jto = pipespan['to']
+                _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
+                              .format(pipe_id, jfrom, jto))
+                if jfrom < njunctions - 1:
+                    a[jfrom, pipe_id] = -1.0
+                if jto < njunctions - 1:
+                    a[jto, pipe_id] = 1.0
+
+            # The B vector is constant 
+            b = np.zeros((npipes))
+            for idx, inflow in enumerate(case_dom['junc']['inflows']):
+                # Use base units of first non-zero flow for result
+                # conversion.
+                if flow_units == '' and inflow.magnitude != 0.0:
+                    flow_units = inflow.to_base_units().units
+                if idx < njunctions - 1:
+                    b[idx] = inflow.to_base_units().magnitude
+
+            done = False
+            converged = False
+
             while not done:
                 # Step 5. Assemble matrix
-                _logger.debug('5. Assemble matrix')
-                if nct == 0:
-                    for pipespan in case_dom['junc']['pipe_map']:
-                        pipe_id = pipespan['id']
-                        jfrom = pipespan['from']
-                        jto = pipespan['to']
-                        _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
-                                      .format(pipe_id, jfrom, jto))
-                        if jfrom < njunctions - 1:
-                            a[jfrom, pipe_id] = -1.0
-                        if jto < njunctions - 1:
-                            a[jto, pipe_id] = 1.0
-    
-                    for idx, inflow in enumerate(case_dom['junc']['inflows']):
-                        # Use base units of first non-zero flow for result
-                        # conversion.
-                        if flow_units == '' and inflow.magnitude != 0.0:
-                            flow_units = inflow.to_base_units().units
-                        if idx < njunctions - 1:
-                            b[idx] = inflow.to_base_units().magnitude
-
+                _logger.debug('5b. Assemble matrix rows of loop equations')
                 for iloop in case_dom['loop']:
                     row_id = njunctions - 1 + iloop
                     _logger.debug('Row id is {0:d} = njunctions + iloop = '
