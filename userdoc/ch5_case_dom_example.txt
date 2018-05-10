@@ -1,0 +1,227 @@
+This is the result of repr(case_dom) reformatted for clarity.
+
+case_dom is a dict composed of heterogenous substructures - lists, dicts, and
+basic data types (int, float). The Jeppson codes make use of the Pint physical
+unit library. Quantity objects from the Pint library are the only non-standard
+data types stored in case_dom. The original Fortran input format limits pipe
+dimensions, flows, etc. to a few hard-coded units which are not obvious when
+examining code input. case_dom stores all physical quantities with units as
+Quantity objects, making unit conversion and display much more convenient.
+
+The top level keys of the case_dom structure are 'params' 'pipe' 'inflows' and
+'loop'. 
+
+case_dom['params'] is a dict of case parameters which define the number of
+elements in the case (pipes, junctions, loops), set numerical convergence
+criteria (maximum number of iterations, numerical tolerance), fluid properties
+(kinematic viscosity), units of measure, and modeling paramters. These
+parameters are specified in the first line of the original Fortran input. The
+parameters are:
+
+   npipes (int): Number of pipes in model
+   njunctions (int): Number of junctions in model
+   nloops (int): Number of loops defined in the model
+   maxiter (int): Maximum number of iterations for iterative solver loop
+   unitcode (int): An integer code ranging from 0 to 3 which sets the physical
+                   units of kinematic viscosity and pipe dimensions when
+                   reading the original Fortran input.
+   tolerance (float): The numerical tolerance of the iterative solver; when the
+                      sum of the absolute difference between the previous and
+                      the current calculated flows is less than the tolerance,
+                      the solution is considered to have converged.
+   kin_visc (Quantity): Kinematic viscosity of the fluid in the pipe network.
+                        This is stored as a Pint Quantity object with
+                        dimensionality of [length]**2 / [time].
+   fvol_flow (float): Model paramter which sets the fractional flow taken when
+                      estimating flow resistance in a pipe. The value may range
+                      between 0.0 and 1.0; 0.1 or 10% of nominal flow is
+                      typical.
+
+case_dom['pipe'] is a list of dicts of length case_dom['npipes']; the dict
+contains pipe geometry, routing, pressure and flow information. This dict
+contains 14 fields, 6 of which are set in the case definition, 6 of which are
+intermediate quantities derived from input data or calculated during the
+iterative solution, and 2 which are results for reporting. Input
+case_dom['pipe'] fields are:
+
+    id (int): Pipe ID; corresponds to list index and ranges from 0 to
+              (case_dom['params']['npipes'] - 1). This value is one less than
+              the pipe ID given in the original Fortran code input; when the
+              original case input files are read, 1 is automatically subtracted
+              from the pipe ID. Pipe, junction, and loop ID are zero-indexed in
+              the Python version of the Jeppson Chapter 5 code; they are
+              one-indexed in the original Fortran input. This reflects the
+              default array indexing schemes in the respective implementation
+              languages.
+    idiameter (Quantity): Pipe inner diameter with dimensionality [length].
+    lpipe (Quantity): Pipe length with dimensionality [length].
+    froughness (Quantity): Absolute pipe roughness with dimensionality of
+                           [length].
+    from (int): Junction ID of pipe source, ranging from 0 to 
+                (case_dom['njunctions'] - 1).
+    to (int): Junction ID of pipe destination, ranging from 0 to 
+              (case_dom['njunctions'] - 1).
+
+Derived and intermediate quantities are:
+
+    LD (float): Length/diameter ratio, dimensionless.
+    flow_area (Quantity): Pipe flow area with dimensionality of [length]**2
+    arl (Quantity): Constant time in kp term with dimensionality 
+                    [time]**2 / [length]**5. Evaluates to 
+                    (L/D) / (2 g Aflow**2)
+    eroughness (float): Relative pipe roughness; ratio of absolute pipe
+                        roughness to diameter. Dimensionless.
+    expp (float): Head loss/flow model exponent on volumetric flow
+    kp (float): Constant term in head loss/flow model.
+
+Note that kp and expp are terms of an archaic correlation which has no easy
+dimensional decomposition. kp has associated dimensions however tracking
+dimensionality would unnecessarily complicate the code so alternate steps are
+taken to ensure the arguments and results of this correlation have the proper
+dimensionality.
+
+Output (reported) quantities are:
+
+    vol_flow (Quantity): Volumetric flow rate through pipe as calculated the
+                         iterative solver. Quantity has dimensionality of
+                         [length]**3 / [time]
+    head_loss (Quantity): Head loss along pipe with dimensionality of [length]
+
+case_dom['inflows'] is a list of length (case_dom['params']['njunctions']) and
+contains the fixed volumetric flow rates into or out of each junction to
+outside the piping network. Flow rates have dimensionality of
+[length]**3 / [time]. Flow into a junction is considered positive; outflow is
+considered negative. These values are read from the junction definition lines
+in the original Fortran code input.
+
+case_dom['loop'] contains a list of case_dom['params']['nloops'] elements. Each
+element is a list of dicts, the dicts containing the zero-indexed pipe ID and
+flow direction of each pipe in a pipe loop. The dict for each pipe contains two
+elements: the zero-indexed pipe ID keyed as 'pipe_id', the flow direction
+within the loop (1.0 indicating forward or clockwise flow, -1.0 indicating
+reverse or counter-clockwise flow), keyed as 'flow_dir'. The data in
+case_dom['loop'] correspond to the last case_dom['params']['nloops'] lines in
+the original Fortran case input.
+
+An example case_dom structure follows:
+
+{
+ 'params': {
+   'npipes': 7,
+   'njunctions': 6,
+   'nloops': 2,
+   'maxiter': 10,
+   'unitcode': 0,
+   'tolerance': 0.001,
+   'kin_visc': <Quantity(1.217e-05, 'foot ** 2 / second')>,
+   'fvol_flow': 0.1},
+ 'pipe': [
+   {'id': 0,
+    'idiameter': <Quantity(8.0, 'inch')>,
+    'lpipe': <Quantity(1106.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 0,
+    'from': 1,
+    'LD': 1659.0,
+    'flow_area': <Quantity(0.03242927866223985, 'meter ** 2')>,
+    'arl': <Quantity(80430.56835296244, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.001275,
+    'expp': 2.058525152318605,
+    'kp': 4.933732590078341,
+    'vol_flow': <Quantity(463.4549982491238, 'gallon / minute')>,
+    'head_loss': <Quantity(5.094483600261081, 'foot')>},
+   {'id': 1, 'idiameter': <Quantity(12.0, 'inch')>,
+    'lpipe': <Quantity(751.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 2,
+    'from': 1,
+    'LD': 751.0,
+    'flow_area': <Quantity(0.07296587699003967, 'meter ** 2')>,
+    'arl': <Quantity(7191.999563393063, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.0008500000000000001,
+    'expp': 2.1262549765578527,
+    'kp': 0.28802209850142646,
+    'vol_flow': <Quantity(294.1967194944881, 'gallon / minute')>,
+    'head_loss': <Quantity(0.18879071331365518, 'foot')>},
+   {'id': 2, 'idiameter': <Quantity(10.0, 'inch')>,
+    'lpipe': <Quantity(1000.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 3,
+    'from': 2,
+    'LD': 1200.0,
+    'flow_area': <Quantity(0.05067074790974977, 'meter ** 2')>,
+    'arl': <Quantity(23829.555730469016, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.00102,
+    'expp': 2.0721600073109654,
+    'kp': 1.6368647096270097,
+    'vol_flow': <Quantity(536.5450017508756, 'gallon / minute')>,
+    'head_loss': <Quantity(1.9567526488409523, 'foot')>},
+   {'id': 3, 'idiameter': <Quantity(12.0, 'inch')>,
+    'lpipe': <Quantity(500.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 0,
+    'from': 3,
+    'LD': 500.0,
+    'flow_area': <Quantity(0.07296587699003967, 'meter ** 2')>,
+    'arl': <Quantity(4788.2819995959135, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.0008500000000000001,
+    'expp': 2.042833314618604,
+    'kp': 0.8616124875151363,
+    'vol_flow': <Quantity(1536.545001750876, 'gallon / minute')>,
+    'head_loss': <Quantity(2.949675631006631, 'foot')>},
+   {'id': 4, 'idiameter': <Quantity(10.0, 'inch')>,
+    'lpipe': <Quantity(1200.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 1,
+    'from': 4,
+    'LD': 1440.0,
+    'flow_area': <Quantity(0.05067074790974977, 'meter ** 2')>,
+    'arl': <Quantity(28595.466876562816, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.00102,
+    'expp': 2.056219982149255,
+    'kp': 2.7042991766939433,
+    'vol_flow': <Quantity(757.6517177436118, 'gallon / minute')>,
+    'head_loss': <Quantity(4.565005861447908, 'foot')>},
+   {'id': 5, 'idiameter': <Quantity(6.0, 'inch')>,
+    'lpipe': <Quantity(600.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 5,
+    'from': 4,
+    'LD': 1200.0,
+    'flow_area': <Quantity(0.01824146924750992, 'meter ** 2')>,
+    'arl': <Quantity(183870.0287844831, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.0017000000000000001,
+    'expp': 2.0246727593594356,
+    'kp': 18.523362453484452,
+    'vol_flow': <Quantity(742.3482822563888, 'gallon / minute')>,
+    'head_loss': <Quantity(30.636879196170817, 'foot')>},
+   {'id': 6, 'idiameter': <Quantity(8.0, 'inch')>,
+    'lpipe': <Quantity(800.0, 'foot')>,
+    'froughness': <Quantity(0.0102, 'inch')>,
+    'to': 5,
+    'from': 2,
+    'LD': 1200.0,
+    'flow_area': <Quantity(0.03242927866223985, 'meter ** 2')>,
+    'arl': <Quantity(58177.62629509038, 'second ** 2 / meter ** 5')>,
+    'eroughness': 0.001275,
+    'expp': 2.0256643663944516,
+    'kp': 9.237806789553956,
+    'vol_flow': <Quantity(1257.6517177436128, 'gallon / minute')>,
+    'head_loss': <Quantity(25.884885863254997, 'foot')>}], 
+ 'inflows': [
+   <Quantity(2000.0, 'gallon / minute')>,
+   <Quantity(0.0, 'meter ** 3 / second')>,
+   <Quantity(-1500.0, 'gallon / minute')>,
+   <Quantity(-1000.0, 'gallon / minute')>,
+   <Quantity(-1500.0, 'gallon / minute')>,
+   <Quantity(2000.0, 'gallon / minute')>],
+ 'loop': [
+   [{'pipe_id': 0, 'flow_dir': 1.0},
+    {'pipe_id': 1, 'flow_dir': -1.0},
+    {'pipe_id': 2, 'flow_dir': -1.0},
+    {'pipe_id': 3, 'flow_dir': -1.0}],
+   [{'pipe_id': 4, 'flow_dir': 1.0},
+    {'pipe_id': 5, 'flow_dir': -1.0},
+    {'pipe_id': 6, 'flow_dir': 1.0},
+    {'pipe_id': 1, 'flow_dir': 1.0}]]
+}
