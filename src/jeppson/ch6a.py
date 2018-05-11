@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This reimplements the pipe flow analysis program given in chapter 5 of *Steady
+This reimplements the first pipe flow analysis program given in chapter 6 of *Steady
 Flow Analysis of Pipe Networks: An Instructional Manual* (1974). *Reports.*
 Paper 300.  http://digitalcommons.usu.edu/water_rep/300 and *Analysis of Flow
 in Pipe Networks* (1976). Ann Arbor Science Publishers, Inc.
 http://www.worldcat.org/title/analysis-of-flow-in-pipe-networks/oclc/927534147
 by Roland W. Jeppson.
 
-Then run `python setup.py install` which will install the command `jeppson_ch5`
+Then run `python setup.py install` which will install the command `jeppson_ch6a`
 inside your current environment.
 """
 from __future__ import division, print_function, absolute_import
@@ -100,12 +100,10 @@ def extract_case_parameters(deck, iptr):
     Raises:
         ValueError: Too few case parameters detected
     """
-    tags = ('npipes', 'njunctions', 'nloops', 'maxiter', 'unitcode',
-            'tolerance', 'kin_visc', 'fvol_flow')
+    tags = ('npipes', 'njunctions', 'jfixed', 'maxiter', 'tolerance')
     mintok = len(tags)
 
     case_params = {
-        '_iread': 1
     }
 
     cpline = deck[iptr]
@@ -118,112 +116,80 @@ def extract_case_parameters(deck, iptr):
               '{1:d} expected)'.format(cpline.ntok, mintok)
         _logger.warning(msg)
 
-    case_params['npipes'] = int(cpline.token[0])
-    case_params['njunctions'] = int(cpline.token[1])
-    case_params['nloops'] = int(cpline.token[2])
-    case_params['maxiter'] = int(cpline.token[3])
-    case_params['unitcode'] = int(cpline.token[4])
-    case_params['tolerance'] = float(cpline.token[5])
-    if case_params['unitcode'] <= 1:
-        case_params['kin_visc'] = Q_(float(cpline.token[6]), 'ft**2/s')
-    else:
-        case_params['kin_visc'] = Q_(float(cpline.token[6]), 'm**2/s')
-    case_params['fvol_flow'] = float(cpline.token[7])
+    for itok, tag in enumerate(tags):
+        if tag == 'tolerance':
+            case_params[tag] = float(cpline.token[itok])
+        else:
+            case_params[tag] = int(cpline.token[itok])
 
     _logger.debug('Successfully read case parameters')
     _logger.debug('  npipes = {0:d}'
                   .format(case_params['npipes']))
     _logger.debug('  njunctions = {0:d}'
                   .format(case_params['njunctions']))
-    _logger.debug('  nloops = {0:d}'
-                  .format(case_params['nloops']))
+    _logger.debug('  jfixed = {0:d}'
+                  .format(case_params['njunctions']))
     _logger.debug('  maxiter = {0:d}'
                   .format(case_params['maxiter']))
-    _logger.debug('  unitcode = {0:d}'
-                  .format(case_params['unitcode']))
     _logger.debug('  tolerance = {0:0.4E}'
                   .format(case_params['tolerance']))
-    _logger.debug('  kin_visc = {0:0.4E~}'
-                  .format(case_params['kin_visc']))
-    _logger.debug('  fvol_flow = {0:0.4f}'
-                  .format(case_params['fvol_flow']))
 
     return case_params
 
 
-def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
+def extract_pipe_definitions(deck, iptr, npipes):
     """Extract pipe definitions
 
     Args:
         deck [(InputLine)]: List of InputLine objects; user input lines
         iptr (int): Starting pointer for reading case parameters
         npipes (int): Number of pipes expected in model
-        npipecards (int): Number of input lines needed to define a single
-          characteristic of all pipes.
-        unitcode (int): Code from input file selecting pipe dimension units
 
     Returns:
         (list): List of dicts containing pipe dimensions
     """
-    pipe_inputconv = [
-        {'idiameter': 'in', 'lpipe': 'ft', 'froughness': 'in'},
-        {'idiameter': 'ft', 'lpipe': 'ft', 'froughness': 'ft'},
-        {'idiameter': 'm', 'lpipe': 'm', 'froughness': 'm'},
-        {'idiameter': 'cm', 'lpipe': 'm', 'froughness': 'cm'}
-    ]
 
-    inunit = pipe_inputconv[unitcode]
-
-    tmppipe = {
-        'idiameter': [],
-        'lpipe': [],
-        'froughness': []
-    }
+    tags = ('from', 'to', 'lpipe', 'idiameter', 'chw')
+    mintok = len(tags)
 
     pipe_info = []
 
-    for ict in range(npipecards):
-        idiamctr = iptr + ict
-        ilpipectr = idiamctr + npipecards
-        ifroughctr = idiamctr + 2 * npipecards
-        for tok in deck[idiamctr].token:
-            tmppipe['idiameter'].append(Q_(float(tok), inunit['idiameter']))
-        for tok in deck[ilpipectr].token:
-            tmppipe['lpipe'].append(Q_(float(tok), inunit['lpipe']))
-        for tok in deck[ifroughctr].token:
-            tmppipe['froughness'].append(Q_(float(tok), inunit['froughness']))
+    for ipipe in range(npipes):
+        currline = deck[iptr + ipipe]
+        if currline.ntok < mintok:
+            msg = 'Too few tokens found in pipe definition line ({0:d} ' \
+                'found, {1:d} expected)'.format(currline.ntok, mintok)
+            _logger.error(msg)
+            _logger.error(currline.as_log())
+            raise ValueError(msg)
+        if currline.ntok > mintok:
+            msg = 'Too many tokens found in pipe definition line ({0:d} ' \
+                'found, {1:d} expected)'.format(currline.ntok, mintok)
+            _logger.warning(msg)
 
-    ndiam = len(tmppipe['idiameter'])
-    nlpipe = len(tmppipe['lpipe'])
-    nrough = len(tmppipe['froughness'])
+        pipe_info.append({
+            'id': ipipe,
+            'from': int(currline.token[0]) - 1,
+            'to': int(currline.token[1]) - 1,
+            'lpipe': Q_(float(currline.token[2]), 'foot'),
+            'idiameter': Q_(float(currline.token[3]), 'in'),
+            'chw': float(currline.token[4])
+        })
 
-    if ndiam != nlpipe or ndiam != nrough:
-        raise ValueError('Mismatched number of pipe attributes: {0:d} '
-                         'diameters, {1:d} lengths, {2:d} roughnesses - all '
-                         'should be equal'.format(ndiam, nlpipe, nrough))
-    elif ndiam != npipes:
-        raise ValueError('{0:d} of each pipe attribute found, {1:d} expected'
-                         .format(ndiam, npipes))
-    else:
-        _logger.debug('Model contains {0:d} pipes ({1:d} expected):'
-                      .format(ndiam, npipes))
-
-    for ict in range(npipes):
-        pipe_info.append({'id': ict,
-                          'idiameter': tmppipe['idiameter'][ict],
-                          'lpipe': tmppipe['lpipe'][ict],
-                          'froughness': tmppipe['froughness'][ict]})
-        currpipe = pipe_info[ict]
-        _logger.debug('  id={0:d}  D= {1:16.4E~} L={2:9.1f~} e={3:16.4E~}'
+    for currpipe in pipe_info:
+        _logger.debug('  Pipe {0:d} from {1:d} to {2:d} L={3:8.1E~} '
+                      'D={4:4.1f~} CHW={5:9.1f}'
                       .format(currpipe['id'],
-                              currpipe['idiameter'],
+                              currpipe['from'],
+                              currpipe['to'],
                               currpipe['lpipe'],
-                              currpipe['froughness']))
+                              currpipe['idiameter'],
+                              currpipe['chw']))
 
     return pipe_info
 
 
-def extract_junctions(deck, iptr, njunctions, npipes):
+def extract_junctions(deck, iptr, njunctions):
     """Extract junction information from user input
 
     Args:
@@ -239,174 +205,49 @@ def extract_junctions(deck, iptr, njunctions, npipes):
           out of range (not in [0..3])
     """
 
-    flow_inputconv = [
-        'skip',
-        'gallon / minute',
-        'ft**3 / sec',
-        'm**3 / sec'
-    ]
+    tags = ('id', 'inflow', 'init_head')
+    mintok = len(tags)
+    junc_info = []
 
-    results = {
-        '_iread': 0,
-        'junc_info': {
-            'inflows': [],
-            'pipe_map': []
-        }
-    }
+    for ijunc in range(njunctions):
+        junc_info.append({'id': ijunc})
 
-    ji = results['junc_info']
     for idx in range(njunctions):
-        ji['inflows'].append(Q_(0.0, 'm**3/s'))
+        currline = deck[iptr + idx]
 
-    for idx in range(npipes):
-        ji['pipe_map'].append({'id': idx, 'to': None, 'from': None})
-
-    jptr = iptr
-    iread = 0
-    ictr = 0
-    while ictr < njunctions:
-        ictr += 1
-        junc_id = ictr - 1
-        iread += 1
-        inflow_units = int(deck[jptr].token[0])
-        njpipes = int(deck[jptr].token[1])
-        _logger.debug('Processing: {0:s}'.format(deck[jptr].as_log()))
-        for itok in range(njpipes):
-            pipe_id = int(deck[jptr].token[itok+2])
-            pipe_in = pipe_id > 0
-            pipe_read_id = abs(pipe_id)
-            pipe_stored_id = pipe_read_id - 1
-
-            if pipe_read_id == 0:
-                msg = 'Junction {0:d} member {1:d} has pipe id ' \
-                      'out of range: (0):'.format(junc_id, itok+1)
-                _logger.error(msg)
-                raise ValueError(msg)
-            else:
-                # Set to zero-index
-                _logger.debug('Note: Pipe id adjusted from {0:d} to {1:d} due '
-                              'to zero-indexing'.format(pipe_read_id,
-                                                        pipe_stored_id))
-                pipespan = ji['pipe_map'][pipe_stored_id]
-                if 'id' not in pipespan:
-                    pipespan['id'] = pipe_stored_id
-
-                if pipe_in:
-                    pipe_dir = 'inflow'
-                    pipespan['to'] = junc_id
-                else:
-                    pipe_dir = 'outflow'
-                    pipespan['from'] = junc_id
-
-                _logger.debug('Junction {0:d} member {1:d} is pipe {2:d}, '
-                              '{3:s}'.format(junc_id, itok+1, pipe_stored_id,
-                                             pipe_dir))
-
-        if inflow_units < 1:
-            _logger.debug('No inflow')
-        elif inflow_units < 4:
-            jptr += 1
-            iread += 1
-            _logger.debug('Processing junction {0:d} inflow: {1:s}'
-                          .format(junc_id, deck[jptr].as_log()))
-            ji['inflows'][junc_id] = Q_(float(deck[jptr].token[0]),
-                                        flow_inputconv[inflow_units])
-            _logger.debug('Inflow of {0:0.4E~}'
-                          .format(ji['inflows'][junc_id]))
-        else:
-            msg = 'Pipe {0:d} junction inflow unit specifier out of range' \
-                  .format(ictr)
+        if currline.ntok < mintok:
+            msg = 'Too few tokens found in junction definition line ({0:d} ' \
+                'found, {1:d} expected)'.format(currline.ntok, mintok)
             _logger.error(msg)
+            _logger.error(currline.as_log())
             raise ValueError(msg)
 
-        jptr += 1
+        if currline.ntok > mintok:
+            msg = 'Too many tokens found in junction definition line ' \
+                '({0:d} found, {1:d} expected)'.format(currline.ntok, mintok)
+            _logger.warning(msg)
 
-    _logger.debug('jptr-iptr={0:d} vs iread={1:d}'.format(jptr-iptr, iread))
-    _logger.debug('next line to read is #{0:d}: {1:s}'
-                  .format(jptr, deck[jptr].as_log()))
+        ijunc = int(currline.token[0]) - 1
+        if ijunc < 0 or ijunc >= njunctions:
+            msg = 'Junction identifier out of range (found {0:s}, ' \
+                  'expected [1 .. {1:d}])' \
+                  .format(currline.token[0], njunctions)
+            _looger.error(msg)
+            _logger.error(currline.as_log())
 
-    results['_iread'] = iread
-    _logger.debug('Read {0:d} junctions over {1:d} input lines.'
-                  .format(ictr, iread))
+            raise ValueError(msg)
+        else:
+            junc_info[ijunc]['inflow'] = Q_(float(currline.token[1]),
+                                            'ft**3/sec')
+            junc_info[ijunc]['init_head'] = Q_(float(currline.token[2]), 'ft')
 
-    _logger.debug('Pipe network topology:')
-    for idx, currpipe in enumerate(ji['pipe_map']):
-        _logger.debug('  Pipe {0:d} connects junction {1:d} to junction {2:d}'
-                      .format(currpipe['id'],
-                              currpipe['from'],
-                              currpipe['to']))
+    for currjunc in junc_info:
+        _logger.debug('  Junction {0:d} Qin={1:8.3f~} H={2:7.2f~}'
+                      .format(currjunc['id'],
+                              currjunc['inflow'],
+                              currjunc['init_head']))
 
-    _logger.debug('Junction inflows:')
-    for idx, qinflow in enumerate(ji['inflows']):
-        _logger.debug('  Inflow to junction {0:d} is {1:0.4E~}'
-                      .format(idx, qinflow))
-
-    return results
-
-
-def extract_loops(deck, iptr, nloops):
-    """Extract pipe loop data for continuity
-    Args:
-        deck [(InputLine)]: List of parsed lines of user input
-        iptr (int): Pointer to first line of loop input
-        nloops (int): Number of loops expected in case
-
-    Returns:
-        (dict): Pipe loop info and metadata
-
-    Raises:
-        ValueError: Pipe ID out of range (<1) in loop definition
-    """
-
-    results = {
-        '_iread': 0,
-        'loop_info': []
-    }
-
-    iloop = 0
-    iread = 0
-    jptr = iptr
-    while iread < nloops:
-        _logger.debug('Processing {0:s}'.format(deck[jptr].as_log()))
-        nlooppipe = int(deck[jptr].token[0])
-        assert nlooppipe == deck[jptr].ntok - 1
-        results['loop_info'].append([])
-        for ipos in range(nlooppipe):
-            pipe_read_id = int(deck[jptr].token[1+ipos])
-            flow_conv = copysign(1.0, pipe_read_id)
-            pipe_read_id = abs(pipe_read_id)
-            pipe_stored_id = pipe_read_id - 1
-            results['loop_info'][iloop].append(
-                {'pipe_id': pipe_stored_id, 'flow_dir': flow_conv})
-            if pipe_read_id == 0:
-                msg = 'Element {0:d} of loop {1:d} has an invalid pipe id ' \
-                      '(0)'.format(ipos+1, iloop+1)
-                _logger.error(msg)
-                raise ValueError(msg)
-
-        iread += 1
-        iloop += 1
-        jptr += 1
-
-    results['_iread'] = iread
-
-    assert nloops == iloop
-
-    for idx in range(iloop):
-        nparts = len(results['loop_info'][idx])
-        _logger.debug('Loop {0:d} contains {1:d} elements:'
-                      .format(idx, nparts))
-        for jdx in range(nparts):
-            if results['loop_info'][idx][jdx]['flow_dir'] > 0.0:
-                flow_dir = 'clockwise (forward)'
-            else:
-                flow_dir = 'counter-clockwise (reverse)'
-            _logger.debug('  Element {0:d} is pipe {1:d}, flow is {2:s}'
-                          .format(jdx+1,
-                                  results['loop_info'][idx][jdx]['pipe_id'],
-                                  flow_dir))
-
-    return results
+    return junc_info
 
 
 def extract_case(iptr, deck):
@@ -427,52 +268,22 @@ def extract_case(iptr, deck):
 
     case_dom['params'] = extract_case_parameters(deck, iptr)
 
-    iptr += case_dom['params']['_iread']
+    iptr += 1
 
-    del(case_dom['params']['_iread'])
-
-    npipes = case_dom['params']['npipes']
-    npipecards = 1
-    pipect = deck[iptr].ntok
-    while pipect < npipes:
-        npipecards += 1
-        pipect += deck[iptr+npipecards-1].ntok
-
-    _logger.debug('Found {0:d} of {1:d} pipes defined in {2:d} lines'
-                  .format(pipect, npipes, npipecards))
 
     # Step 2. Read pipe data
     _logger.debug('2. Reading pipe data')
-    unitcode = case_dom['params']['unitcode']
-    case_dom['pipe'] = extract_pipe_definitions(deck, iptr, npipes,
-                                                npipecards, unitcode)
+    npipes = case_dom['params']['npipes']
+    case_dom['pipe'] = extract_pipe_definitions(deck, iptr, npipes)
 
-    iptr += 3 * npipecards
+    iptr += npipes
 
     # Step 3. Read junction data
-    _logger.debug('3. Reading junction inflows and pipe network '
-                  'topology')
+    _logger.debug('3. Reading junction inflow and head')
     njunctions = case_dom['params']['njunctions']
-    pipemap_info = extract_junctions(deck, iptr, njunctions, npipes)
+    case_dom['junc'] = extract_junctions(deck, iptr, njunctions)
 
-    # Migrate case_dom['junc']['pipe_map'] info into case_dom['pipe']
-    for pmap in pipemap_info['junc_info']['pipe_map']:
-        pipe_id = pmap['id']
-        case_dom['pipe'][pipe_id]['to'] = pmap['to']
-        case_dom['pipe'][pipe_id]['from'] = pmap['from']
-
-    case_dom['inflows'] = pipemap_info['junc_info']['inflows']
-
-    iptr += pipemap_info['_iread']
-
-    # Step 4. Read loop data
-    _logger.debug('4. Reading loop continuity data')
-    nloops = case_dom['params']['nloops']
-    pipeloop_info = extract_loops(deck, iptr, nloops)
-
-    case_dom['loop'] = pipeloop_info['loop_info']
-
-    iptr += pipeloop_info['_iread']
+    iptr += njunctions
 
     # Done reading input; assert (iptr + iread - 1) == len(deck) for a
     # single case
@@ -483,8 +294,8 @@ def extract_case(iptr, deck):
 
 def solve_network_flows(case_dom):
     """Find the volumetric flow and head loss for the piping network defined in
-    the case_dom structure by using the linear method as described in Chapter 5
-    of Jeppson.
+    the case_dom structure by using the first method described in Chapter 6 of
+    Jeppson.
     
     Args:
         case_dom (dict): Pipe flow network object model
@@ -493,7 +304,7 @@ def solve_network_flows(case_dom):
         ValueError: Network solution matrix is singular or does not converge.
     """
 
-# The goal of this project is to reimplement the JEPPSON_CH5 code in Python,
+# The goal of this project is to reimplement the JEPPSON_CH6A code in Python,
 # not simply translate the original Fortran into Python. For this reason, pipe,
 # junction, and loop indices are zero-based, default NumPy matrix storage is
 # used. This complicates the comparison between the original Fortran and the
@@ -894,7 +705,7 @@ def main(args):
 
     args = parse_args(args)
     setup_logging(args.loglevel)
-    _logger.info("Starting jeppson_ch5")
+    _logger.info("Starting jeppson_ch6a")
 
     for fh in args.file:
         msg = 'Processing file: {0:s}'.format(fh.name)
@@ -926,30 +737,30 @@ def main(args):
                 _logger.info('Advancing to next file.')
                 break
 
-            set_pipe_derived_properties(case_dom['pipe'])
-
-            print(pipe_dimension_table(case_dom['pipe']))
-            print()
-
-            try:
-                solve_network_flows(case_dom)
-            except ValueError as err:
-                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
-                              .format(icase, fh.name, str(err)))
-                _logger.info('Advancing to next case.')
-                continue
-
-            # Step 10. Display results
-            _logger.debug('10. Display final results')
-        
-            print(flow_and_head_loss_report(case_dom))
-        
-            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
-            create_topology_dotfile(case_dom, dotfn)
+#            set_pipe_derived_properties(case_dom['pipe'])
+#
+#            print(pipe_dimension_table(case_dom['pipe']))
+#            print()
+#
+#            try:
+#                solve_network_flows(case_dom)
+#            except ValueError as err:
+#                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
+#                              .format(icase, fh.name, str(err)))
+#                _logger.info('Advancing to next case.')
+#                continue
+#
+#            # Step 10. Display results
+#            _logger.debug('10. Display final results')
+#        
+#            print(flow_and_head_loss_report(case_dom))
+#        
+#            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
+#            create_topology_dotfile(case_dom, dotfn)
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))
-    _logger.info("Ending jeppson_ch5")
+    _logger.info("Ending jeppson_ch6a")
 
 
 def run():
