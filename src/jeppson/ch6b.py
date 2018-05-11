@@ -138,7 +138,7 @@ def extract_pipe_definitions(deck, iptr, npipes):
         (list): List of dicts containing pipe dimensions
     """
 
-    tags = ('id', 'lpipe', 'idiameter', 'chw', 'init_vol_flow')
+    tags = ('id', 'idiameter', 'lpipe', 'froughness', 'init_vol_flow')
     mintok = len(tags)
 
     pipe_info = []
@@ -160,83 +160,22 @@ def extract_pipe_definitions(deck, iptr, npipes):
 
         pipe_id = int(currline.token[0]) - 1
 
-        pipe_info[pipe_id]['lpipe'] = Q_(float(currline.token[1]), 'foot')
-        pipe_info[pipe_id]['idiameter'] = Q_(float(currline.token[2]), 'in')
+        pipe_info[pipe_id]['idiameter'] = Q_(float(currline.token[1]), 'in')
+        pipe_info[pipe_id]['lpipe'] = Q_(float(currline.token[2]), 'foot')
         pipe_info[pipe_id]['chw'] = float(currline.token[3])
         pipe_info[pipe_id]['init_vol_flow'] = Q_(float(currline.token[4]),
                                                  'ft**3/sec')
 
     for currpipe in pipe_info:
-        _logger.debug('  Pipe {0:d} L={1:8.1E~} D={2:4.1f~} CHW={3:9.1f} '
+        _logger.debug('  Pipe {0:d} D={2:4.1f~} L={1:8.1E~} CHW={3:9.1f} '
                       'Qinit={4:8.2f~}'
                       .format(currpipe['id'],
-                              currpipe['lpipe'],
                               currpipe['idiameter'],
+                              currpipe['lpipe'],
                               currpipe['chw'],
                               currpipe['init_vol_flow']))
 
     return pipe_info
-
-
-def extract_junctions(deck, iptr, njunctions):
-    """Extract junction information from user input
-
-    Args:
-        deck [(InputLine)]: List of parsed lines of user input
-        iptr (int): Pointer to first line of junction input
-        njunctions (int): Number of junctions expected in model
-
-    Returns:
-        (dict): Junction info and metadata
-
-    Raises:
-        ValueError: Pipe ID out of range (<1) or junction flow unit specifier
-          out of range (not in [0..3])
-    """
-
-    tags = ('id', 'inflow', 'init_head')
-    mintok = len(tags)
-    junc_info = []
-
-    for ijunc in range(njunctions):
-        junc_info.append({'id': ijunc})
-
-    for idx in range(njunctions):
-        currline = deck[iptr + idx]
-
-        if currline.ntok < mintok:
-            msg = 'Too few tokens found in junction definition line ({0:d} ' \
-                'found, {1:d} expected)'.format(currline.ntok, mintok)
-            _logger.error(msg)
-            _logger.error(currline.as_log())
-            raise ValueError(msg)
-
-        if currline.ntok > mintok:
-            msg = 'Too many tokens found in junction definition line ' \
-                '({0:d} found, {1:d} expected)'.format(currline.ntok, mintok)
-            _logger.warning(msg)
-
-        ijunc = int(currline.token[0]) - 1
-        if ijunc < 0 or ijunc >= njunctions:
-            msg = 'Junction identifier out of range (found {0:s}, ' \
-                  'expected [1 .. {1:d}])' \
-                  .format(currline.token[0], njunctions)
-            _logger.error(msg)
-            _logger.error(currline.as_log())
-
-            raise ValueError(msg)
-        else:
-            junc_info[ijunc]['inflow'] = Q_(float(currline.token[1]),
-                                            'ft**3/sec')
-            junc_info[ijunc]['init_head'] = Q_(float(currline.token[2]), 'ft')
-
-    for currjunc in junc_info:
-        _logger.debug('  Junction {0:d} Qin={1:8.3f~} H={2:7.2f~}'
-                      .format(currjunc['id'],
-                              currjunc['inflow'],
-                              currjunc['init_head']))
-
-    return junc_info
 
 
 def extract_loops(deck, iptr, nloops):
@@ -418,9 +357,8 @@ def extract_case(iptr, deck):
     # Step 3. Read loop data
     _logger.debug('3. Reading loop continuity data')
     nloops = case_dom['params']['nloops']
-    loop_info = extract_loops(deck, iptr, nloops)
 
-    case_dom['loop'] = loop_info
+    case_dom['loop'] = extract_loops(deck, iptr, nloops)
 
     iptr += nloops
 

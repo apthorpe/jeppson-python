@@ -1,22 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-This reimplements the first pipe flow analysis program given in chapter 6 of
-*Steady Flow Analysis of Pipe Networks: An Instructional Manual* (1974).
+This reimplements the Hardy Cross pipe flow analysis program given in chapter 7
+of *Steady Flow Analysis of Pipe Networks: An Instructional Manual* (1974).
 *Reports.* Paper 300.  http://digitalcommons.usu.edu/water_rep/300 and
 *Analysis of Flow in Pipe Networks* (1976). Ann Arbor Science Publishers, Inc.
 http://www.worldcat.org/title/analysis-of-flow-in-pipe-networks/oclc/927534147
 by Roland W. Jeppson.
 
-Then run `python setup.py install` which will install the command
-`jeppson_ch6a` inside your current environment.
+Then run `python setup.py install` which will install the command `jeppson_ch7`
+inside your current environment.
 """
 from __future__ import division, print_function, absolute_import
 
 import argparse
 # from collections import namedtuple, OrderedDict
 import logging
-from math import log
+from math import copysign, log
 from os.path import abspath, splitext
 import sys
 
@@ -100,7 +100,7 @@ def extract_case_parameters(deck, iptr):
     Raises:
         ValueError: Too few case parameters detected
     """
-    tags = ('npipes', 'njunctions', 'jfixed', 'maxiter', 'tolerance')
+    tags = ('npipes', 'nloops', 'maxiter', 'kin_visc', 'tolerance', 'grav2')
     mintok = len(tags)
 
     case_params = {
@@ -108,31 +108,34 @@ def extract_case_parameters(deck, iptr):
 
     cpline = deck[iptr]
     if cpline.ntok < mintok:
-        msg = 'Too few entries found for case parameters ({0:d} expected)' \
-              .format(mintok)
+        msg = 'Too few entries found for case parameters ({0:d} found, )' \
+              '{1:d} expected)'.format(cpline.ntok, mintok)
         raise ValueError(msg)
     elif cpline.ntok > mintok:
         msg = 'Too many entries found for case parameters ({0:d} found, ' \
               '{1:d} expected)'.format(cpline.ntok, mintok)
         _logger.warning(msg)
 
-    for itok, tag in enumerate(tags):
-        if tag == 'tolerance':
-            case_params[tag] = float(cpline.token[itok])
-        else:
-            case_params[tag] = int(cpline.token[itok])
+    case_params['npipes'] = int(cpline.token[0])
+    case_params['nloops'] = int(cpline.token[1])
+    case_params['maxiter'] = int(cpline.token[2])
+    case_params['kin_visc'] = Q_(float(cpline.token[3]), 'ft**2/s')
+    case_params['tolerance'] = float(cpline.token[4])
+    case_params['grav2'] = Q_(float(cpline.token[5]), 'ft/s**2')
 
     _logger.debug('Successfully read case parameters')
-    _logger.debug('  npipes = {0:d}'
-                  .format(case_params['npipes']))
-    _logger.debug('  njunctions = {0:d}'
-                  .format(case_params['njunctions']))
-    _logger.debug('  jfixed = {0:d}'
-                  .format(case_params['njunctions']))
-    _logger.debug('  maxiter = {0:d}'
-                  .format(case_params['maxiter']))
-    _logger.debug('  tolerance = {0:0.4E}'
-                  .format(case_params['tolerance']))
+    _logger.debug('  {0:s} = {1:d}'
+                  .format('npipes', case_params['npipes']))
+    _logger.debug('  {0:s} = {1:d}'
+                  .format('nloops', case_params['nloops']))
+    _logger.debug('  {0:s} = {1:d}'
+                  .format('maxiter', case_params['maxiter']))
+    _logger.debug('  {0:s} = {1:0.4E~}'
+                  .format('kin_visc', case_params['kin_visc']))
+    _logger.debug('  {0:s} = {1:0.4E}'
+                  .format('tolerance', case_params['tolerance']))
+    _logger.debug('  {0:s} = {1:0.4E~}'
+                  .format('grav2', case_params['grav2']))
 
     return case_params
 
@@ -149,10 +152,12 @@ def extract_pipe_definitions(deck, iptr, npipes):
         (list): List of dicts containing pipe dimensions
     """
 
-    tags = ('from', 'to', 'lpipe', 'idiameter', 'chw')
+    tags = ('id', 'idiameter', 'lpipe', 'froughness', 'init_vol_flow')
     mintok = len(tags)
 
     pipe_info = []
+    for ipipe in range(npipes):
+        pipe_info.append({'id': ipipe})
 
     for ipipe in range(npipes):
         currline = deck[iptr + ipipe]
@@ -167,87 +172,77 @@ def extract_pipe_definitions(deck, iptr, npipes):
                 'found, {1:d} expected)'.format(currline.ntok, mintok)
             _logger.warning(msg)
 
-        pipe_info.append({
-            'id': ipipe,
-            'from': int(currline.token[0]) - 1,
-            'to': int(currline.token[1]) - 1,
-            'idiameter': Q_(float(currline.token[2]), 'in'),
-            'lpipe': Q_(float(currline.token[3]), 'foot'),
-            'chw': float(currline.token[4])
-        })
+        pipe_id = int(currline.token[0]) - 1
+
+        pipe_info[pipe_id]['idiameter'] = Q_(float(currline.token[1]), 'in')
+        pipe_info[pipe_id]['lpipe'] = Q_(float(currline.token[2]), 'foot')
+        pipe_info[pipe_id]['froughness'] = Q_(float(currline.token[3]), 'in')
+        pipe_info[pipe_id]['init_vol_flow'] = Q_(float(currline.token[4]),
+                                                 'ft**3/sec')
 
     for currpipe in pipe_info:
-        _logger.debug('  Pipe {0:d} from {1:d} to {2:d} D={3:4.1f~} '
-                      'L={4:8.1E~} CHW={5:9.1f}'
+        _logger.debug('  Pipe {0:d} D={1:4.1f~} L={2:8.1E~} '
+                      'froughness={3:0.4E~} Qinit={4:8.2f~}'
                       .format(currpipe['id'],
-                              currpipe['from'],
-                              currpipe['to'],
                               currpipe['idiameter'],
                               currpipe['lpipe'],
-                              currpipe['chw']))
+                              currpipe['froughness'],
+                              currpipe['init_vol_flow']))
 
     return pipe_info
 
 
-def extract_junctions(deck, iptr, njunctions):
-    """Extract junction information from user input
-
+def extract_loops(deck, iptr, nloops):
+    """Extract pipe loop data for continuity
     Args:
         deck [(InputLine)]: List of parsed lines of user input
-        iptr (int): Pointer to first line of junction input
-        njunctions (int): Number of junctions expected in model
+        iptr (int): Pointer to first line of loop input
+        nloops (int): Number of loops expected in case
 
     Returns:
-        (dict): Junction info and metadata
+        (dict): Pipe loop info and metadata
 
     Raises:
-        ValueError: Pipe ID out of range (<1) or junction flow unit specifier
-          out of range (not in [0..3])
+        ValueError: Pipe ID out of range (<1) in loop definition
     """
 
-    tags = ('id', 'inflow', 'init_head')
-    mintok = len(tags)
-    junc_info = []
+    loop_info = []
+    for iloop in range(nloops):
+        currline = deck[iptr+iloop]
+        _logger.debug('Processing {0:s}'.format(currline.as_log()))
+        nlooppipe = int(currline.token[0])
+        assert nlooppipe == currline.ntok - 1
 
-    for ijunc in range(njunctions):
-        junc_info.append({'id': ijunc})
+        loop_info.append([])
 
-    for idx in range(njunctions):
-        currline = deck[iptr + idx]
+        for ipos in range(nlooppipe):
+            pipe_read_id = int(currline.token[1+ipos])
+            flow_conv = copysign(1.0, pipe_read_id)
+            pipe_read_id = abs(pipe_read_id)
+            pipe_stored_id = pipe_read_id - 1
+            loop_info[iloop].append(
+                {'pipe_id': pipe_stored_id, 'flow_dir': flow_conv})
+            if pipe_read_id == 0:
+                msg = 'Element {0:d} of loop {1:d} has an invalid pipe id ' \
+                      '(0)'.format(ipos+1, iloop+1)
+                _logger.error(msg)
+                raise ValueError(msg)
 
-        if currline.ntok < mintok:
-            msg = 'Too few tokens found in junction definition line ({0:d} ' \
-                'found, {1:d} expected)'.format(currline.ntok, mintok)
-            _logger.error(msg)
-            _logger.error(currline.as_log())
-            raise ValueError(msg)
+    for idx in range(nloops):
+        nparts = len(loop_info[idx])
+        _logger.debug('Loop {0:d} contains {1:d} elements:'
+                      .format(idx, nparts))
+        for jdx in range(nparts):
+            if loop_info[idx][jdx]['flow_dir'] > 0.0:
+                flow_dir = 'clockwise (forward)'
+            else:
+                flow_dir = 'counter-clockwise (reverse)'
+            _logger.debug('  Element {0:d} is pipe {1:d}, flow is {2:s}'
+                          .format(jdx+1,
+                                  loop_info[idx][jdx]['pipe_id'],
+                                  flow_dir))
 
-        if currline.ntok > mintok:
-            msg = 'Too many tokens found in junction definition line ' \
-                '({0:d} found, {1:d} expected)'.format(currline.ntok, mintok)
-            _logger.warning(msg)
-
-        ijunc = int(currline.token[0]) - 1
-        if ijunc < 0 or ijunc >= njunctions:
-            msg = 'Junction identifier out of range (found {0:s}, ' \
-                  'expected [1 .. {1:d}])' \
-                  .format(currline.token[0], njunctions)
-            _logger.error(msg)
-            _logger.error(currline.as_log())
-
-            raise ValueError(msg)
-        else:
-            junc_info[ijunc]['inflow'] = Q_(float(currline.token[1]),
-                                            'ft**3/sec')
-            junc_info[ijunc]['init_head'] = Q_(float(currline.token[2]), 'ft')
-
-    for currjunc in junc_info:
-        _logger.debug('  Junction {0:d} Qin={1:8.3f~} H={2:7.2f~}'
-                      .format(currjunc['id'],
-                              currjunc['inflow'],
-                              currjunc['init_head']))
-
-    return junc_info
+    return loop_info
 
 
 def extract_case(iptr, deck):
@@ -277,15 +272,15 @@ def extract_case(iptr, deck):
 
     iptr += npipes
 
-    # Step 3. Read junction data
-    _logger.debug('3. Reading junction inflow and head')
-    njunctions = case_dom['params']['njunctions']
-    case_dom['junc'] = extract_junctions(deck, iptr, njunctions)
+    # Step 3. Read loop data
+    _logger.debug('3. Reading loop continuity data')
+    nloops = case_dom['params']['nloops']
 
-    iptr += njunctions
+    case_dom['loop'] = extract_loops(deck, iptr, nloops)
 
-    # Done reading input; assert (iptr + iread - 1) == len(deck) for a
-    # single case
+    iptr += nloops
+
+    # Done reading input
     case_dom['params']['next_iptr'] = iptr
 
     return case_dom
@@ -303,7 +298,7 @@ def solve_network_flows(case_dom):
         ValueError: Network solution matrix is singular or does not converge.
     """
 
-# The goal of this project is to reimplement the JEPPSON_CH6A code in Python,
+# The goal of this project is to reimplement the JEPPSON_CH7 code in Python,
 # not simply translate the original Fortran into Python. For this reason, pipe,
 # junction, and loop indices are zero-based, default NumPy matrix storage is
 # used. This complicates the comparison between the original Fortran and the
@@ -705,7 +700,7 @@ def main(args):
 
     args = parse_args(args)
     setup_logging(args.loglevel)
-    _logger.info("Starting jeppson_ch6a")
+    _logger.info("Starting jeppson_ch7")
 
     for fh in args.file:
         msg = 'Processing file: {0:s}'.format(fh.name)
@@ -760,7 +755,7 @@ def main(args):
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))
-    _logger.info("Ending jeppson_ch6a")
+    _logger.info("Ending jeppson_ch7")
 
 
 def run():

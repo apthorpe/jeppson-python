@@ -22,8 +22,8 @@ jeppson_ch4  = jeppson.ch4:run
 jeppson_ch5  = jeppson.ch5:run
 jeppson_ch6a = jeppson.ch6a:run
 jeppson_ch6b = jeppson.ch6b:run
+jeppson_ch7  = jeppson.ch7:run
 """
-# jeppson_ch7  = jeppson.ch7:run
 
 
 def setup_package():
