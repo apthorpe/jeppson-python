@@ -24,7 +24,6 @@ import sys
 import scipy.constants as sc
 # from fluids.core import Reynolds
 from fluids.friction import friction_factor
-import numpy as np
 import pygraphviz as pgv
 
 from . import _logger, ureg, Q_
@@ -327,19 +326,13 @@ def solve_network_flows(case_dom):
 # corresponding entries in the b column vector are zero since the flow around a
 # loop is conservative - no net increase or decrease.
 
-    ugrav = Q_(sc.g, 'm/s**2')
     nct = 0
     ssum = 100.0
-    flow_units = ''
-    npipes = case_dom['params']['npipes']
-    nloops = case_dom['params']['nloops']
     kin_visc = case_dom['params']['kin_visc']
 
     # Set kp and expp for each pipe
     for pipe in case_dom['pipe']:
-#        _logger.debug('qi = {0:0.4E~}'.format(pipe['init_vol_flow']))
         qm = abs(pipe['init_vol_flow'])
-#        _logger.debug('qm = {0:0.4E~}'.format(qm))
         pipe['vol_flow'] = qm
         dq = case_dom['params']['fvol_flow'] * qm
 
@@ -348,9 +341,9 @@ def solve_network_flows(case_dom):
         v1 = q1 / pipe['flow_area'].to('ft**2')
         v2 = q2 / pipe['flow_area'].to('ft**2')
         Re1 = (v1 * pipe['idiameter'].to('ft') / kin_visc) \
-              .to_base_units().magnitude
+            .to_base_units().magnitude
         Re2 = (v2 * pipe['idiameter'].to('ft') / kin_visc) \
-              .to_base_units().magnitude
+            .to_base_units().magnitude
         f1 = friction_factor(Re=Re1, eD=pipe['eroughness'])
         f2 = friction_factor(Re=Re2, eD=pipe['eroughness'])
 
@@ -358,7 +351,7 @@ def solve_network_flows(case_dom):
         if Re1 < 2050.0:
             # laminar
             pipe['expp'] = 1.0
-            pipe['kp'] = (case_dom['params']['grav2'] * kin_visc 
+            pipe['kp'] = (case_dom['params']['grav2'] * kin_visc
                           * pipe['arl'] / pipe['idiameter'].to('ft')
                           ).magnitude
 
@@ -373,14 +366,14 @@ def solve_network_flows(case_dom):
             pipe['kp'] = (ae * pipe['arl']).magnitude
 
         _logger.debug('Pipe {0:d} kp = {1:0.4E} expp = {2:0.4f}'
-            .format(pipe['id'], pipe['kp'], pipe['expp']))
+                      .format(pipe['id'], pipe['kp'], pipe['expp']))
 
         _logger.debug('Pipe {0:d} ae = {1:0.4f} be = {2:0.4f}'
-            .format(pipe['id'], ae, be))
+                      .format(pipe['id'], ae, be))
 
     done = False
     converged = False
- 
+
     while not done:
         # Step 5. Iteratively correct flows
         _logger.debug('Iteratively correct flows')
@@ -393,7 +386,7 @@ def solve_network_flows(case_dom):
                 currpipe = case_dom['pipe'][pid]
                 hl = ((pipe['flow_dir'] * currpipe['kp']
                        * currpipe['vol_flow']
-                         .to('ft**3/s').magnitude**currpipe['expp']))
+                       .to('ft**3/s').magnitude**currpipe['expp']))
                 currpipe['head_loss'] = Q_(abs(hl), 'ft')
                 sum1 += hl
                 _logger.debug('q = {0:0.4E~}'.format(currpipe['vol_flow']))
@@ -493,7 +486,7 @@ def pipe_dimension_table(pipelist):
                           currpipe['lpipe'].to('ft'), currpipe['eroughness'])
     return result
 
-#
+
 def flow_and_head_loss_report(case_dom):
     """Return a string containing the final calculated volumetric flow and head
     loss in each pipe
