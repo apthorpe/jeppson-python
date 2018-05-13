@@ -15,6 +15,7 @@ from __future__ import division, print_function, absolute_import
 
 import argparse
 # from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 import logging
 from math import log
 from os.path import abspath, splitext
@@ -30,6 +31,8 @@ import pygraphviz as pgv
 from . import _logger, ureg, Q_
 # from jeppson.pipe import Pipe
 from jeppson.input import InputLine
+from jeppson.constants import ahws_us, eshw, echw, edhw
+
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
@@ -122,13 +125,23 @@ def extract_case_parameters(deck, iptr):
         else:
             case_params[tag] = int(cpline.token[itok])
 
+    if case_params['jfixed'] < 1 \
+        or case_params['jfixed'] > case_params['njunctions']:
+        msg = 'ID of fixed junction out of range; found {0:d}, expected ' \
+              '[1 .. {1:d}]'.format(case_params['jfixed'],
+                                    case_params['njunctions'])
+        raise ValueError(msg)
+    else:
+        # Reduce junction ID by one (zero-indexed)
+        case_params['jfixed'] -= 1
+
     _logger.debug('Successfully read case parameters')
     _logger.debug('  npipes = {0:d}'
                   .format(case_params['npipes']))
     _logger.debug('  njunctions = {0:d}'
                   .format(case_params['njunctions']))
-    _logger.debug('  jfixed = {0:d}'
-                  .format(case_params['njunctions']))
+    _logger.debug('  jfixed = {0:d} (zero-indexed)'
+                  .format(case_params['jfixed']))
     _logger.debug('  maxiter = {0:d}'
                   .format(case_params['maxiter']))
     _logger.debug('  tolerance = {0:0.4E}'
@@ -149,7 +162,7 @@ def extract_pipe_definitions(deck, iptr, npipes):
         (list): List of dicts containing pipe dimensions
     """
 
-    tags = ('from', 'to', 'lpipe', 'idiameter', 'chw')
+    tags = ('from', 'to', 'idiameter', 'chw', 'lpipe')
     mintok = len(tags)
 
     pipe_info = []
@@ -172,8 +185,8 @@ def extract_pipe_definitions(deck, iptr, npipes):
             'from': int(currline.token[0]) - 1,
             'to': int(currline.token[1]) - 1,
             'idiameter': Q_(float(currline.token[2]), 'in'),
-            'lpipe': Q_(float(currline.token[3]), 'foot'),
-            'chw': float(currline.token[4])
+            'chw': float(currline.token[3]),
+            'lpipe': Q_(float(currline.token[4]), 'foot')
         })
 
     for currpipe in pipe_info:
@@ -291,6 +304,17 @@ def extract_case(iptr, deck):
     return case_dom
 
 
+def calculate_head_loss(case_dom):
+    """Calculate head loss along pipes based on junction heads
+
+    Args:
+        case_dom (dict): Pipe network data model"""
+
+    for pipe in case_dom['pipe']:
+        pipe['head_loss'] = (case_dom['junc'][pipe['from']]['head']
+                             - case_dom['junc'][pipe['to']]['head'])
+
+
 def solve_network_flows(case_dom):
     """Find the volumetric flow and head loss for the piping network defined in
     the case_dom structure by using the first method described in Chapter 6 of
@@ -332,65 +356,120 @@ def solve_network_flows(case_dom):
     ugrav = Q_(sc.g, 'm/s**2')
     nct = 0
     ssum = 100.0
-    flow_units = ''
     npipes = case_dom['params']['npipes']
     njunctions = case_dom['params']['njunctions']
-    qpredict = np.zeros(npipes)
 
-    # Set (njunctions-1) independent, conservative junction equations.
-    # Note that the remaining junction equation can be derived from the
-    # junction equations specified so far.
+    for junc in case_dom['junc']:
+        junc['head'] = junc['init_head']
 
-    _logger.debug('5a. Assemble constant portions of matrix and RHS vector')
+    calculate_head_loss(case_dom)
 
-    a = np.zeros((npipes, npipes))
-    # This portion of the A matrix is constant
-    for pipe in case_dom['pipe']:
-        pipe_id = pipe['id']
-        jfrom = pipe['from']
-        jto = pipe['to']
-        _logger.debug('Pipe {0:d} goes from {1:d} to {2:d}'
-                      .format(pipe_id, jfrom, jto))
-        if jfrom < njunctions - 1:
-            a[jfrom, pipe_id] = -1.0
-        if jto < njunctions - 1:
-            a[jto, pipe_id] = 1.0
+# In some universe, the line below is clearer than the four which follow it.
+# Then again some people think Perl's map() syntax is clear too. The difference
+# is that few people in the Perl community will give you grief for avoiding the
+# use of map().
+#
+# For the purpose of satisfying those who demand at least one list
+# comprehension per Python project (warranted or not), the following is
+# provided. It lacks the clarity and robustness of the commented equivalent
+# code (does not support diagnostics or error-handling), however it does uphold
+# the Perl tradition of being inscrutable, ridden with punctuation, and best of
+# all, it's crammed into a single line.
 
-    # The B vector is constant
-    b = np.zeros((npipes))
-    for idx, inflow in enumerate(case_dom['inflows']):
-        # Use base units of first non-zero flow for result
-        # conversion.
-        if flow_units == '' and inflow.magnitude != 0.0:
-            flow_units = inflow.to_base_units().units
-        if idx < njunctions - 1:
-            b[idx] = inflow.to_base_units().magnitude
+# Ref: https://google.github.io/styleguide/pyguide.html#List_Comprehensions
+
+    jfixed = case_dom['params']['jfixed']
+#    _logger.debug('njunctions: {:d}'.format(njunctions))
+#    _logger.debug('jfixed: {:d}'.format(jfixed))
+
+#    livejunc = list(range(njunctions))
+#    del livejunc[jfixed]
+#
+#    _logger.debug('livejunc: ' + repr(livejunc))
+#
+#    livejunc = []
+#    for ijunc in range(njunctions):
+#        if ijunc != jfixed:
+#            livejunc.append(ijunc)
+#
+#    _logger.debug('livejunc: ' + repr(livejunc))
+#
+    # Junction ID from matrix index
+    livejunc = [i for i in range(njunctions) if i != jfixed]
+
+#    _logger.debug('livejunc: ' + repr(livejunc))
+
+    # Matrix index from junction ID
+    rcid_junc = OrderedDict()
+    for idx, ijunc in enumerate(livejunc):
+        rcid_junc[ijunc] = idx
+
+    assert jfixed not in rcid_junc
 
     done = False
     converged = False
 
     while not done:
         # Step 5. Assemble matrix
-        _logger.debug('5b. Assemble matrix rows of loop equations')
-        for iloop, looppipe in enumerate(case_dom['loop']):
-            row_id = njunctions - 1 + iloop
-            _logger.debug('Row id is {0:d} = njunctions + iloop = '
-                          '{1:d} + {2:d}'.format(row_id, njunctions,
-                                                 iloop))
-            for pipe in looppipe:
-                pid = pipe['pipe_id']
-                col_id = pid
-                resistance = (pipe['flow_dir']
-                              * case_dom['pipe'][pid]['kp'])
-                _logger.debug('  Col id is {0:d}; resistance = {1:0.4E}'
-                              .format(col_id, resistance))
-                a[row_id, col_id] = resistance
+        _logger.debug('5a. Assemble matrix rows of junction equations')
 
-        _logger.debug('Resultant flows are in units of {0:s}'
-                      .format(flow_units))
+        a = np.zeros((njunctions-1, njunctions-1))
+        b = np.zeros((njunctions-1))
 
-#        print(repr(a))
-#        print(repr(b))
+        for pipe in case_dom['pipe']:
+            ifrom = pipe['from']
+            ito = pipe['to']
+
+            arg = ((case_dom['junc'][ifrom]['head']
+                    - case_dom['junc'][ito]['head']).to('ft').magnitude
+                   / pipe['kp'])
+#            _logger.debug('arg(p={0:d}) = {1:12.4E}'.format(pipe['id'], arg))
+#            _logger.debug('dh = {:12.4E}'.format(
+#                          (case_dom['junc'][ifrom]['head']
+#                           - case_dom['junc'][ito]['head']).to('ft').magnitude))
+#            _logger.debug('kp = {:12.4E}'.format(pipe['kp']))
+
+            if ifrom in rcid_junc:
+                idx = rcid_junc[ifrom]
+                arge = arg**eshw
+                _logger.debug('From: arge = {:12.4E}'.format(arge))
+                b[idx] += arge
+                z = arge * eshw / (pipe['kp'] * arg)
+#                _logger.debug('b(jn={0:d}) += {1:12.4E}'.format(ifrom, arge))
+                a[idx, idx] += z
+                _logger.debug('a[{:d}, {:d}] += {:12.4E}'.format(idx, idx, z))
+                if ito in rcid_junc:
+                    jdx = rcid_junc[ito]
+                    a[jdx, idx] -= z
+                    _logger.debug('a[{:d}, {:d}] -= {:12.4E}'.format(jdx, idx, z))
+
+            if ito in rcid_junc:
+                idx = rcid_junc[ito]
+                arge = -(arg**eshw)
+                _logger.debug('To: arge = {:12.4E}'.format(arge))
+                b[idx] += arge
+                z = arge * eshw / (pipe['kp'] * arg)
+#                _logger.debug('b(jn={0:d}) += {1:12.4E}'.format(ito, arge))
+                a[idx, idx] -= z
+                _logger.debug('a[{:d}, {:d}] -= {:12.4E}'.format(idx, idx, z))
+                if ifrom in rcid_junc:
+                    jdx = rcid_junc[ifrom]
+                    a[jdx, idx] += z
+                    _logger.debug('a[{:d}, {:d}] += {:12.4E}'.format(jdx, idx, z))
+
+            # *->from
+#            F(JE,I1) = F(JE,I1) + ARGE * ESHW / (K(I) * ARG)
+           
+            # *->to
+#            F(JE,I2) = F(JE,I2) - ARGE * ESHW / (K(I) * ARG)
+
+        for idx, ijunc in enumerate(livejunc):
+            b[idx] -= case_dom['junc'][ijunc]['inflow'] \
+                      .to('ft**3/s').magnitude
+#            _logger.debug('b(jn={0:d}) -= {1:12.4E}'.format(ijunc, qj))
+
+        print('a: ' + repr(a))
+        print('b: ' + repr(b))
 
         # Call matrix solver
         # Step 6. Solve matrix
@@ -407,80 +486,31 @@ def solve_network_flows(case_dom):
             # force-exit iteration loop
             break
 
-#        print(repr(x))
+        print(repr(x))
 
         _logger.debug('7. Adjust matrix')
-        if nct > 0:
-            ssum = 0.0
 
+        ssum = 0.0
+        for idx, ijunc in enumerate(livejunc):
+            ssum += abs(x[idx])
+            case_dom['junc'][ijunc]['head'] -= Q_(x[idx], 'ft')
+
+        calculate_head_loss(case_dom)
+
+        recalc_head = False
         for ipipe, currpipe in enumerate(case_dom['pipe']):
-            if nct > 0:
-                qm = 0.5 * (qpredict[ipipe] + x[ipipe])
-                ssum += abs(qpredict[ipipe] - x[ipipe])
-            else:
-                qm = x[ipipe]
+            if currpipe['head_loss'].magnitude < 0.0:
+                recalc_head = True
+                currpipe['head_loss'] = -currpipe['head_loss']
+                ifrom = currpipe['from']
+                ito = currpipe['to']
+                print('Flow reversal detected in pipe {:d} from {:d} to {:d}'
+                      .format(ipipe, ifrom, ito))
+                currpipe['to'] = ifrom
+                currpipe['from'] = ito
 
-            qpredict[ipipe] = qm
-            dq = Q_(qm * case_dom['params']['fvol_flow'], flow_units)
-            qmu = Q_(abs(qm), flow_units)
-#            vflowe = qmu / currpipe['flow_area']
-
-            qq_lo = qmu - dq
-            vflowv_lo = qq_lo / currpipe['flow_area']
-
-            qq_hi = qmu + dq
-            vflowv_hi = qq_hi / currpipe['flow_area']
-
-            if vflowv_lo.magnitude < 0.001:
-                vflowv_lo = Q_(0.002, vflowv_lo.units)
-                _logger.info('  Flow velocity low endpoint for pipe {0:d} '
-                             'increased to {1:0.4E~}'.format(ipipe, vflowv_lo))
-
-            re_lo = (vflowv_lo * currpipe['idiameter']
-                     / case_dom['params']['kin_visc']).to_base_units()
-
-            re_hi = (vflowv_hi * currpipe['idiameter']
-                     / case_dom['params']['kin_visc']).to_base_units()
-
-            _logger.debug('  Pipe {0:d} Re varies from {1:0.4E~} to '
-                          '{1:0.4E~}'.format(ipipe, re_lo, re_hi))
-
-            friction_lo = friction_factor(Re=re_lo, eD=currpipe['eroughness'])
-
-            friction_hi = friction_factor(Re=re_hi, eD=currpipe['eroughness'])
-
-            _logger.debug('  Pipe {0:d} f varies from {1:0.4E~} to {1:0.4E~}'
-                          .format(ipipe, friction_lo, friction_hi))
-
-            # Calculate new Kp for each pipe based on flow regime and
-            # friction factor
-
-            # Note: Flow is laminar for Reynolds number less than 2050
-            if re_lo < 2050.0:
-                currpipe['expp'] = 1.0
-                tmp_kp = (2.0 * ugrav * case_dom['params']['kin_visc']
-                          * currpipe['arl'] / currpipe['idiameter'])
-                currpipe['kp'] = tmp_kp.to('1/ft**3/s').magnitude
-                _logger.debug('  Pipe {0:d} flow in laminar region'
-                              .format(ipipe))
-            else:
-                # Consider only transition regime, not transition-rough
-                be = ((log(friction_lo) - log(friction_hi))
-                      / (log(qq_lo.to('ft**3/s').magnitude)
-                         - log(qq_hi.to('ft**3/s').magnitude)))
-                ae = friction_lo * qq_lo.to('ft**3/s').magnitude**be
-                ep = 1.0 - be
-                currpipe['expp'] = 2.0 - be
-                currpipe['kp'] = (
-                    ae * currpipe['arl'].to('s**2/ft**5').magnitude
-                    * qmu.to('ft**3/s').magnitude**ep).magnitude
-                _logger.debug('  arl is in units of {0:s}'
-                              .format(currpipe['arl'].units))
-                _logger.debug('  Pipe {0:d} flow in transition / '
-                              'turbulent region'.format(ipipe))
-
-            _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
-                          .format(ipipe, currpipe['kp']))
+#        if recalc_head:
+#            calculate_head_loss(case_dom)
 
         _logger.debug('8. Display interim results')
         print('Iteration {0:d}'.format(nct))
@@ -488,15 +518,17 @@ def solve_network_flows(case_dom):
               .format(ssum, case_dom['params']['tolerance']))
 
         print()
-        print('Pipe   Kp            expp          Qcurrent                  '
-              'Qpredict')
+        print('Pipe   Kp            Head loss')
         for ipipe, currpipe in enumerate(case_dom['pipe']):
-            print('{0:3d}    {1:0.4E}    {2:0.4E}    {3:0.4E~}    {4:0.4E~}'
+            print('{0:3d}    {1:0.4E}    {2:0.4E~}'
                   .format(ipipe,
                           currpipe['kp'],
-                          currpipe['expp'],
-                          Q_(x[ipipe], 'm**3/s').to('ft**3/s'),
-                          Q_(qpredict[ipipe], 'm**3/s').to('ft**3/s')))
+                          currpipe['head_loss'].to('ft')))
+        print()
+        print('Junction    Head')
+        for ijunc, currjunc in enumerate(case_dom['junc']):
+            print('{0:3d}         {1:0.4E~}'
+                  .format(ijunc, currjunc['head'].to('ft')))
         print()
 
         nct += 1
@@ -514,18 +546,18 @@ def solve_network_flows(case_dom):
         # Advance to next case
         raise ValueError(msg)
 
-    # Add final results to case_dom
-    flow_disp_units = 'm**3/s'
-    for qext in case_dom['inflows']:
-        if qext != 0.0:
-            flow_disp_units = qext.units
-            break
-
-    for ipipe, currpipe in enumerate(case_dom['pipe']):
-        currpipe['vol_flow'] = Q_(x[ipipe], 'm**3/s').to(flow_disp_units)
-        currpipe['head_loss'] = (Q_(currpipe['kp']
-                                    * currpipe['vol_flow'].to('ft**3/s')
-                                    .magnitude, 'ft'))
+#    # Add final results to case_dom
+#    flow_disp_units = 'm**3/s'
+#    for qext in case_dom['inflow']:
+#        if qext != 0.0:
+#            flow_disp_units = qext.units
+#            break
+#
+#    for ipipe, currpipe in enumerate(case_dom['pipe']):
+#        currpipe['vol_flow'] = Q_(x[ipipe], 'm**3/s').to(flow_disp_units)
+#        currpipe['head_loss'] = (Q_(currpipe['kp']
+#                                    * currpipe['vol_flow'].to('ft**3/s')
+#                                    .magnitude, 'ft'))
 
     return
 
@@ -546,66 +578,39 @@ def set_pipe_derived_properties(pipelist):
 
         currpipe['flow_area'] = (
             sc.pi / 4.0 * currpipe['idiameter']**2
-        ).to_base_units()
+        ).to('ft**2')
 
         currpipe['arl'] = (
             currpipe['lpipe'] / (2.0 * ugrav * currpipe['idiameter']
                                  * currpipe['flow_area']**2)
-        ).to_base_units()
-
-        currpipe['eroughness'] = (
-            currpipe['froughness']
-            / currpipe['idiameter']
-        ).to_base_units().magnitude
-
-        # For the initial pass, the value of kpcoeff should not matter.
-        # kpcoeff is a constant multiplier on all non-zero terms in each loop
-        # equation. Loop equations are homogeneous (B[iloop] = 0) so the
-        # results are only affected by the (L/D) exponential term for each
-        # pipe; only the relative magnitudes of the coefficient in the loop
-        # equations determine the calculated flows.
-
-        # Later iterations of the solver loop use laminar or turbulent
-        # correlations to calculate kp; kpcoeff is not used after this point.
-
-# Method 1:
-#        # Note: Use SI coefficient since base units are SI (mks)
-#        kpcoeff = 2.12E-3.
-
-# Method 2:
-        # Note: Use US coefficient since dP/dQ calculations are done using
-        # Q in ft**3/s
-        kpcoeff = 9.517E-4
-
-# Method 3:
-#        unitcode = case_dom['params'].unitcode
-#        if unitcode in (0, 1):
-#            # Coefficient for traditional (US) units
-#            kpcoeff = 9.517E-4
-#        elif unitcode in (2, 3):
-#            # Coefficient for mks (SI) units
-#            kpcoeff = 2.12E-3
-#        else:
-#            raise ValueError('Unknown unit code {0:d}, expected (0..3)'
-#                             .format(unitcode))
+        ).to('s**2/ft**5')
 
         currpipe['expp'] = 0.0
-        currpipe['kp'] = kpcoeff * currpipe['LD'] ** 4.87
+
+        currpipe['kp'] = (ahws_us * currpipe['lpipe'].to('ft').magnitude
+                          / (currpipe['chw']**echw
+                             * currpipe['idiameter'].to('ft').magnitude**edhw))
 
         _logger.debug('Pipe {:d}: '
                       'Aflow = {:0.4E~}, '
                       'arl = {:0.4E~}, '
-                      'eD = {:0.4E}, '
                       'LD = {:0.4E}, '
-                      'Kp = {:0.4E}, '
+                      'kp = {:0.4E}, '
                       'expp = {:0.4E}'
                       .format(currpipe['id'],
                               currpipe['flow_area'],
                               currpipe['arl'],
-                              currpipe['eroughness'],
                               currpipe['LD'],
                               currpipe['kp'],
                               currpipe['expp']))
+
+        _logger.debug('ahws_us = {:f}'.format(ahws_us))
+        _logger.debug('L (ft) = {:f}'.format(currpipe['lpipe'].to('ft').magnitude))
+        _logger.debug('chw = {:g}'.format(currpipe['chw']))
+        _logger.debug('echw = {:f}'.format(echw))
+        _logger.debug('D (ft) = {:f}'.format(currpipe['idiameter'].to('ft').magnitude))
+        _logger.debug('edhw = {:f}'.format(edhw))
+
 
     return
 
@@ -619,11 +624,11 @@ def pipe_dimension_table(pipelist):
     Returns:
         (str): Text table of pipe dimensions"""
 
-    result = 'Pipe    Diameter         Length           Rel. Roughness\n'
+    result = 'Pipe    Diameter         Length         CHW\n'
     for currpipe in pipelist:
-        result += '{0:3d}     {1:12.4E~}    {2:12.4E~}  {3:12.4E}\n' \
+        result += '{0:3d}     {1:12.4E~}    {2:12.4E~}  {3:7.3f}\n' \
                   .format(currpipe['id'], currpipe['idiameter'],
-                          currpipe['lpipe'], currpipe['eroughness'])
+                          currpipe['lpipe'], currpipe['chw'])
     return result
 
 
@@ -667,7 +672,7 @@ def create_topology_dotfile(case_dom, filepath='tmp.gv'):
 
     G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
 
-    for idx, inflow in enumerate(case_dom['inflows']):
+    for idx, inflow in enumerate(case_dom['inflow']):
         jtag = jfmt.format(idx)
         jxtag = jxfmt.format(idx)
         G.add_node(jtag, shape='circle', label=jtag)
@@ -737,26 +742,28 @@ def main(args):
                 _logger.info('Advancing to next file.')
                 break
 
-#            set_pipe_derived_properties(case_dom['pipe'])
-#
-#            print(pipe_dimension_table(case_dom['pipe']))
-#            print()
-#
-#            try:
-#                solve_network_flows(case_dom)
-#            except ValueError as err:
-#                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
-#                              .format(icase, fh.name, str(err)))
-#                _logger.info('Advancing to next case.')
-#                continue
-#
-#            # Step 10. Display results
-#            _logger.debug('10. Display final results')
+            set_pipe_derived_properties(case_dom['pipe'])
+
+            print(pipe_dimension_table(case_dom['pipe']))
+            print()
+
+            try:
+                solve_network_flows(case_dom)
+            except ValueError as err:
+                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
+                              .format(icase, fh.name, str(err)))
+                _logger.info('Advancing to next case.')
+                continue
+
+            # Step 10. Display results
+            _logger.debug('10. Display final results')
 #
 #            print(flow_and_head_loss_report(case_dom))
 #
 #            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
 #            create_topology_dotfile(case_dom, dotfn)
+
+            print(repr(case_dom))
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))

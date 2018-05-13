@@ -11,7 +11,7 @@ by Roland W. Jeppson.
 Then run `python setup.py install` which will install the command `jeppson_ch5`
 inside your current environment.
 """
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import argparse
 from collections import namedtuple, OrderedDict
