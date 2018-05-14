@@ -46,7 +46,7 @@ def parse_args(args):
       :obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser(
-        description="Linear method flow solver")
+        description="Hardy Cross method flow solver")
     parser.add_argument(
         '--version',
         action='version',
