@@ -14,9 +14,9 @@ inside your current environment.
 from __future__ import absolute_import, division, print_function
 
 import argparse
-from collections import namedtuple, OrderedDict
+# from collections import namedtuple, OrderedDict
 import logging
-from math import copysign, log, nan
+from math import copysign, log
 from os.path import abspath, splitext
 import sys
 
@@ -27,7 +27,7 @@ from fluids.friction import friction_factor
 import numpy as np
 import pygraphviz as pgv
 
-from . import _logger, ureg, Q_
+from . import _logger, Q_
 # from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
@@ -91,7 +91,7 @@ def extract_case_parameters(deck, iptr):
     """Parse out network characteristics
 
     Args:
-        deck [(InputLine)]: List of parsed input data lines
+        deck ([InputLine]): List of parsed input data lines
         iptr (int): Starting pointer for reading case parameters
 
     Returns:
@@ -155,7 +155,7 @@ def extract_pipe_definitions(deck, iptr, npipes, npipecards, unitcode):
     """Extract pipe definitions
 
     Args:
-        deck [(InputLine)]: List of InputLine objects; user input lines
+        deck ([InputLine]): List of InputLine objects; user input lines
         iptr (int): Starting pointer for reading case parameters
         npipes (int): Number of pipes expected in model
         npipecards (int): Number of input lines needed to define a single
@@ -227,7 +227,7 @@ def extract_junctions(deck, iptr, njunctions, npipes):
     """Extract junction information from user input
 
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of junction input
         njunctions (int): Number of junctions expected in model
 
@@ -347,7 +347,7 @@ def extract_junctions(deck, iptr, njunctions, npipes):
 def extract_loops(deck, iptr, nloops):
     """Extract pipe loop data for continuity
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of loop input
         nloops (int): Number of loops expected in case
 
@@ -414,7 +414,7 @@ def extract_case(iptr, deck):
 
     Args:
         iptr (int): Pointer to first unread line of user input in deck
-        deck (InputLine): List of tokenized lines of user input
+        deck ([InputLine]): List of tokenized lines of user input
 
     Returns:
         (dict): Pipe flow network object model
@@ -485,7 +485,7 @@ def solve_network_flows(case_dom):
     """Find the volumetric flow and head loss for the piping network defined in
     the case_dom structure by using the linear method as described in Chapter 5
     of Jeppson.
-    
+
     Args:
         case_dom (dict): Pipe flow network object model
 
@@ -518,6 +518,8 @@ def solve_network_flows(case_dom):
 # actual flow direction will be determined from the problem solution. The
 # corresponding entries in the b column vector are zero since the flow around a
 # loop is conservative - no net increase or decrease.
+
+    ugrav = Q_(sc.g, 'm/s**2')
 
     nct = 0
     ssum = 100.0
@@ -675,7 +677,7 @@ def solve_network_flows(case_dom):
         print('Iteration {0:d}'.format(nct))
         print('Deviation {0:0.4E} (Tolerance {1:0.4E}'
               .format(ssum, case_dom['params']['tolerance']))
-        
+
         print()
         print('Pipe   Kp            expp          Qcurrent                  '
               'Qpredict')
@@ -713,7 +715,8 @@ def solve_network_flows(case_dom):
     for ipipe, currpipe in enumerate(case_dom['pipe']):
         currpipe['vol_flow'] = Q_(x[ipipe], 'm**3/s').to(flow_disp_units)
         currpipe['head_loss'] = (Q_(currpipe['kp']
-            * currpipe['vol_flow'].to('ft**3/s').magnitude, 'ft'))
+                                    * currpipe['vol_flow']
+                                    .to('ft**3/s').magnitude, 'ft'))
 
     return
 
@@ -843,14 +846,14 @@ def flow_and_head_loss_report(case_dom):
 
 def create_topology_dotfile(case_dom, filepath='tmp.gv'):
     """Create directed graph in GraphViz ``dot`` format
-    
+
     Args:
         case_dom (dict): Pipe network object model
         filepath (str): Absolute path of dotfile"""
 
     jfmt = 'J{:d}'
     jxfmt = 'JX{:d}'
-    pfmt = 'P{:d}'
+#    pfmt = 'P{:d}'
     pqfmt = 'P{:d}: {:0.1f~}'
 
     G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
@@ -890,7 +893,6 @@ def main(args):
     Args:
         args ([str]): command line parameter list
     """
-    ugrav = Q_(sc.g, 'm/s**2')
 
     args = parse_args(args)
     setup_logging(args.loglevel)
@@ -941,9 +943,9 @@ def main(args):
 
             # Step 10. Display results
             _logger.debug('10. Display final results')
-        
+
             print(flow_and_head_loss_report(case_dom))
-        
+
             dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
             create_topology_dotfile(case_dom, dotfn)
 

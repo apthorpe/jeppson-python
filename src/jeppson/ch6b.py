@@ -27,7 +27,7 @@ from fluids.friction import friction_factor
 import numpy as np
 import pygraphviz as pgv
 
-from . import _logger, ureg, Q_
+from . import _logger, Q_
 # from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
@@ -91,7 +91,7 @@ def extract_case_parameters(deck, iptr):
     """Parse out network characteristics
 
     Args:
-        deck [(InputLine)]: List of parsed input data lines
+        deck ([InputLine]): List of parsed input data lines
         iptr (int): Starting pointer for reading case parameters
 
     Returns:
@@ -130,7 +130,7 @@ def extract_pipe_definitions(deck, iptr, npipes):
     """Extract pipe definitions
 
     Args:
-        deck [(InputLine)]: List of InputLine objects; user input lines
+        deck ([InputLine]): List of InputLine objects; user input lines
         iptr (int): Starting pointer for reading case parameters
         npipes (int): Number of pipes expected in model
 
@@ -181,7 +181,7 @@ def extract_pipe_definitions(deck, iptr, npipes):
 def extract_loops(deck, iptr, nloops):
     """Extract pipe loop data for continuity
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of loop input
         nloops (int): Number of loops expected in case
 
@@ -234,7 +234,7 @@ def extract_loops(deck, iptr, nloops):
 def extract_pumps(deck, iptr, npumps):
     """Extract pump curve, pipe ID, and flow direction
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of pump input
         npumps (int): Number of pumps expected in case
 
@@ -289,7 +289,7 @@ def extract_pumps(deck, iptr, npumps):
 def extract_pseudoloops(deck, iptr, npseudoloops):
     """Extract pipe pseudoloop data for continuity
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of pseudoloop input
         npseudoloops (int): Number of pseudoloops expected in case
 
@@ -332,7 +332,7 @@ def extract_case(iptr, deck):
 
     Args:
         iptr (int): Pointer to first unread line of user input in deck
-        deck (InputLine): List of tokenized lines of user input
+        deck ([InputLine]): List of tokenized lines of user input
 
     Returns:
         (dict): Pipe flow network object model

@@ -88,7 +88,7 @@ def extract_case_parameters(deck, iptr):
     """Parse out network characteristics
 
     Args:
-        deck [(InputLine)]: List of parsed input data lines
+        deck ([InputLine]): List of parsed input data lines
         iptr (int): Starting pointer for reading case parameters
 
     Returns:
@@ -148,7 +148,7 @@ def extract_pipe_definitions(deck, iptr, npipes):
     """Extract pipe definitions
 
     Args:
-        deck [(InputLine)]: List of InputLine objects; user input lines
+        deck ([InputLine]): List of InputLine objects; user input lines
         iptr (int): Starting pointer for reading case parameters
         npipes (int): Number of pipes expected in model
 
@@ -200,7 +200,7 @@ def extract_junctions(deck, iptr, njunctions):
     """Extract junction information from user input
 
     Args:
-        deck [(InputLine)]: List of parsed lines of user input
+        deck ([InputLine]): List of parsed lines of user input
         iptr (int): Pointer to first line of junction input
         njunctions (int): Number of junctions expected in model
 
@@ -262,7 +262,7 @@ def extract_case(iptr, deck):
 
     Args:
         iptr (int): Pointer to first unread line of user input in deck
-        deck (InputLine): List of tokenized lines of user input
+        deck ([InputLine]): List of tokenized lines of user input
 
     Returns:
         (dict): Pipe flow network object model
