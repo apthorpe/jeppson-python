@@ -11,7 +11,7 @@ by Roland W. Jeppson.
 Then run `python setup.py install` which will install the command
 `jeppson_ch6b` inside your current environment.
 """
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import argparse
 import logging
@@ -497,7 +497,7 @@ def set_flow_jacobian(case_dom, dq):
 
 def solve_network_flows(case_dom):
     """Find the volumetric flow and head loss for the piping network defined in
-    the case_dom structure by using the first method described in Chapter 6 of
+    the case_dom structure by using the second method described in Chapter 6 of
     Jeppson.
 
     Args:
@@ -652,7 +652,7 @@ def flow_and_head_loss_report(case_dom):
     loss in each pipe
 
     Args:
-        case_dom (dict): Pipe network data model
+        case_dom (dict): Pipe flow network data model
 
     Returns:
         (str): Table containing the final calculated volumetric flow and head
@@ -719,18 +719,26 @@ def main(args):
             print(pipe_dimension_table(case_dom['pipe']))
             print()
 
+            failed = False
             try:
                 solve_network_flows(case_dom)
             except ValueError as err:
-                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
-                              .format(icase, fh.name, str(err)))
-                _logger.info('Advancing to next case.')
-                continue
+                failed = True
+                if str(err).startswith('Cannot solve'):
+                    _logger.error('Failed to solve case {0:d} '
+                                  'from {1:s}: {2:s}'
+                                  .format(icase, fh.name, str(err)))
+                    _logger.info('Advancing to next case.')
+                    continue
 
             # Step 10. Display results
             _logger.debug('10. Display final results')
 
             print('\nFinal results:\n')
+            if failed:
+                print('WARNING: Case {0:d} did not converge.\n'
+                      .format(icase))
+
             print(flow_and_head_loss_report(case_dom))
 
 #            print('case_dom:')

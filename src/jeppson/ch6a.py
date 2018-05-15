@@ -11,11 +11,12 @@ by Roland W. Jeppson.
 Then run `python setup.py install` which will install the command
 `jeppson_ch6a` inside your current environment.
 """
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import argparse
 from collections import OrderedDict
 import logging
+# import pprint
 from math import copysign
 from os.path import abspath, splitext
 import sys
@@ -32,6 +33,8 @@ from jeppson import __version__
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
+
+# _pp = pprint.PrettyPrinter(indent=4)
 
 
 def parse_args(args):
@@ -265,7 +268,7 @@ def extract_case(iptr, deck):
         deck ([InputLine]): List of tokenized lines of user input
 
     Returns:
-        (dict): Pipe flow network object model
+        (dict): Pipe flow network data model
         """
 
     case_dom = {}
@@ -320,7 +323,7 @@ def solve_network_flows(case_dom):
     Jeppson.
 
     Args:
-        case_dom (dict): Pipe flow network object model
+        case_dom (dict): Pipe flow network data model
 
     Raises:
         ValueError: Network solution matrix is singular or does not converge.
@@ -375,25 +378,9 @@ def solve_network_flows(case_dom):
 # Ref: https://google.github.io/styleguide/pyguide.html#List_Comprehensions
 
     jfixed = case_dom['params']['jfixed']
-#    _logger.debug('njunctions: {:d}'.format(njunctions))
-#    _logger.debug('jfixed: {:d}'.format(jfixed))
 
-#    livejunc = list(range(njunctions))
-#    del livejunc[jfixed]
-#
-#    _logger.debug('livejunc: ' + repr(livejunc))
-#
-#    livejunc = []
-#    for ijunc in range(njunctions):
-#        if ijunc != jfixed:
-#            livejunc.append(ijunc)
-#
-#    _logger.debug('livejunc: ' + repr(livejunc))
-#
     # Junction ID from matrix index
     livejunc = [i for i in range(njunctions) if i != jfixed]
-
-#    _logger.debug('livejunc: ' + repr(livejunc))
 
     # Matrix index from junction ID
     rcid_junc = OrderedDict()
@@ -570,7 +557,7 @@ def pipe_results_table(case_dom):
     """Print pipe dimensions in a tabular text format
 
     Args:
-        case_dom (dict): Pipe network data model
+        case_dom (dict): Pipe flow network data model
 
     Returns:
         (str): Text table of pipe dimensions, routing, and results"""
@@ -599,7 +586,7 @@ def junction_results_table(case_dom):
     """Generate a text table of junction results
 
     Args:
-        case_dom (dict): Pipe network object model
+        case_dom (dict): Pipe flow network data model
 
     Returns:
         (str): Table of junction results"""
@@ -624,7 +611,7 @@ def create_topology_dotfile(case_dom, filepath='tmp.gv'):
     """Create directed graph in GraphViz ``dot`` format
 
     Args:
-        case_dom (dict): Pipe network object model
+        case_dom (dict): Pipe flow network data model
         filepath (str): Absolute path of dotfile"""
 
     jfmt = 'J{:d}'
@@ -746,7 +733,8 @@ def main(args):
             dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
             create_topology_dotfile(case_dom, dotfn)
 
-#            print(repr(case_dom))
+#            print('case_dom:')
+#            _pp.pprint(case_dom)
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))

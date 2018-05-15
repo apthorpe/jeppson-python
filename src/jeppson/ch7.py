@@ -11,29 +11,26 @@ by Roland W. Jeppson.
 Then run `python setup.py install` which will install the command `jeppson_ch7`
 inside your current environment.
 """
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import argparse
-# from collections import namedtuple, OrderedDict
 import logging
+# import pprint
 from math import copysign, log
-from os.path import abspath, splitext
 import sys
 
-# import iapws
 import scipy.constants as sc
-# from fluids.core import Reynolds
 from fluids.friction import friction_factor
-import pygraphviz as pgv
 
 from . import _logger, ureg, Q_
-# from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
+
+# _pp = pprint.PrettyPrinter(indent=4)
 
 
 def parse_args(args):
@@ -492,7 +489,7 @@ def flow_and_head_loss_report(case_dom):
     loss in each pipe
 
     Args:
-        case_dom (dict): Pipe network object model
+        case_dom (dict): Pipe flow network data model
 
     Returns:
         (str): Table containing the final calculated volumetric flow and head
@@ -511,49 +508,6 @@ def flow_and_head_loss_report(case_dom):
                           currpipe['head_loss'].to('ft'))
 
     return outstr
-
-
-def create_topology_dotfile(case_dom, filepath='tmp.gv'):
-    """Create directed graph in GraphViz ``dot`` format
-
-    Args:
-        case_dom (dict): Pipe network object model
-        filepath (str): Absolute path of dotfile"""
-
-    jfmt = 'J{:d}'
-    jxfmt = 'JX{:d}'
-#    pfmt = 'P{:d}'
-    pqfmt = 'P{:d}: {:0.1f~}'
-
-    G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
-
-    for idx, inflow in enumerate(case_dom['inflows']):
-        jtag = jfmt.format(idx)
-        jxtag = jxfmt.format(idx)
-        G.add_node(jtag, shape='circle', label=jtag)
-        if inflow.magnitude > 0.0:
-            G.add_node(jxtag, shape='none', label='')
-            G.add_edge(jxfmt.format(idx), jtag, color='blue',
-                       label='{:0.1f~}'.format(inflow))
-        elif inflow.magnitude < 0.0:
-            G.add_node(jxtag, shape='none', label='')
-            G.add_edge(jtag, jxfmt.format(idx), color='red',
-                       label='{:0.1f~}'.format(abs(inflow)))
-
-    for idx, link in enumerate(case_dom['pipe']):
-        pqtag = pqfmt.format(idx, link['vol_flow'])
-        jfrom = jfmt.format(link['from'])
-        jto = jfmt.format(link['to'])
-        G.add_edge(jfrom, jto, label=pqtag)
-
-    dotfn = abspath(filepath)
-    basepath, ext = splitext(dotfn)
-    pngpath = abspath(basepath + '.png')
-    _logger.debug('Writing png to {:s}'.format(pngpath))
-    G.write(dotfn)
-    G.draw(path=pngpath, prog='dot')
-
-    return
 
 
 def main(args):
@@ -603,23 +557,30 @@ def main(args):
             print(pipe_dimension_table(case_dom['pipe']))
             print()
 
+            failed = False
             try:
                 solve_network_flows(case_dom)
             except ValueError as err:
-                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
-                              .format(icase, fh.name, str(err)))
-                _logger.info('Advancing to next case.')
-                continue
+                failed = True
+                if str(err).startswith('Cannot solve'):
+                    _logger.error('Failed to solve case {0:d} '
+                                  'from {1:s}: {2:s}'
+                                  .format(icase, fh.name, str(err)))
+                    _logger.info('Advancing to next case.')
+                    continue
 
             # Step 10. Display results
             _logger.debug('10. Display final results')
 
+            print('Final results:\n')
+            if failed:
+                print('WARNING: Case {0:d} did not converge.\n'
+                      .format(icase))
+
             print(flow_and_head_loss_report(case_dom))
 
-#           dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
-#           create_topology_dotfile(case_dom, dotfn)
-
-#            print(repr(case_dom))
+#            print('case_dom:')
+#            _pp.pprint(case_dom)
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))

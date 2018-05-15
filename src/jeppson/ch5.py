@@ -14,27 +14,26 @@ inside your current environment.
 from __future__ import absolute_import, division, print_function
 
 import argparse
-# from collections import namedtuple, OrderedDict
 import logging
+# import pprint
 from math import copysign, log
 from os.path import abspath, splitext
 import sys
 
-# import iapws
 import scipy.constants as sc
-# from fluids.core import Reynolds
 from fluids.friction import friction_factor
 import numpy as np
 import pygraphviz as pgv
 
 from . import _logger, Q_
-# from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
+
+# _pp = pprint.PrettyPrinter(indent=4)
 
 
 def parse_args(args):
@@ -417,7 +416,7 @@ def extract_case(iptr, deck):
         deck ([InputLine]): List of tokenized lines of user input
 
     Returns:
-        (dict): Pipe flow network object model
+        (dict): Pipe flow network data model
         """
 
     case_dom = {}
@@ -487,7 +486,7 @@ def solve_network_flows(case_dom):
     of Jeppson.
 
     Args:
-        case_dom (dict): Pipe flow network object model
+        case_dom (dict): Pipe flow network data model
 
     Raises:
         ValueError: Network solution matrix is singular or does not converge.
@@ -823,7 +822,7 @@ def flow_and_head_loss_report(case_dom):
     loss in each pipe
 
     Args:
-        case_dom (dict): Pipe network object model
+        case_dom (dict): Pipe network data model
 
     Returns:
         (str): Table containing the final calculated volumetric flow and head
@@ -944,10 +943,14 @@ def main(args):
             # Step 10. Display results
             _logger.debug('10. Display final results')
 
+            print('\nFinal results:\n')
             print(flow_and_head_loss_report(case_dom))
 
             dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
             create_topology_dotfile(case_dom, dotfn)
+
+#            print('case_dom:')
+#            _pp.pprint(case_dom)
 
             _logger.info('Done processing case {:d}'.format(icase))
         _logger.info('Done processing {0:s}'.format(fh.name))
