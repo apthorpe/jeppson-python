@@ -14,18 +14,13 @@ Then run `python setup.py install` which will install the command
 from __future__ import division, print_function, absolute_import
 
 import argparse
-# from collections import namedtuple, OrderedDict
 import logging
-import pprint
+# import pprint
 from math import copysign
-from os.path import abspath, splitext
 import sys
 
-# import iapws
 import scipy.constants as sc
-# from fluids.core import Reynolds
 import numpy as np
-import pygraphviz as pgv
 
 from . import _logger, Q_
 from jeppson.input import InputLine
@@ -37,7 +32,7 @@ __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
-_pp = pprint.PrettyPrinter(indent=4)
+# _pp = pprint.PrettyPrinter(indent=4)
 
 
 def parse_args(args):
@@ -438,10 +433,6 @@ def set_loop_head_loss(case_dom, dq):
                     pid = pump['pipe_id']
                     if pid not in pipelist:
                         continue
-#                    pipedir = 0
-#                    for looppipe in case_dom['loop'][iloop]:
-#                        if looppipe['pipe_id'] == pid:
-#                            pipedir = looppipe['flow_dir']
                     currpipe = case_dom['pipe'][pid]
                     qi = currpipe['init_vol_flow'].to('ft**3/s').magnitude
                     qcfs = abs(qi * pump['flow_dir'] + dq[iloop])
@@ -490,19 +481,13 @@ def set_flow_jacobian(case_dom, dq):
                     pid = pump['pipe_id']
                     if pid not in pipelist:
                         continue
-#                    pipedir = 0
-#                    for looppipe in case_dom['loop'][iloop]:
-#                        if looppipe['pipe_id'] == pid:
-#                            pipedir = looppipe['flow_dir']
                     currpipe = case_dom['pipe'][pid]
-#                    pipedir = currpipe['loopdir'][iloop]
                     qi = currpipe['init_vol_flow'].to('ft**3/s').magnitude
                     qcfs = abs(qi * pump['flow_dir'] + dq[iloop])
                     q = Q_(qcfs, 'ft**3/s')
 #                    hp = ((pump['a'] * q) + pump['b']) * q + pump['h0']
                     dhp = (2.0 * pump['a'] * q + pump['b']) \
                         .to('sec/ft**2').magnitude
-#                    b[iloop] -= pump['flow_dir'] * hp.to('ft').magnitude
 #                    LLP is a pipe ID, not a loop ID - how does this work?
 #                    a[iloop,LLP(IK)] += pump['flow_dir'] * dhp
                     a[iloop, pid] += pump['flow_dir'] * dhp
@@ -522,14 +507,10 @@ def solve_network_flows(case_dom):
         ValueError: Network solution matrix is singular or does not converge.
     """
 
-#    ugrav = Q_(sc.g, 'm/s**2')
     nct = 0
     ssum = 0.0
     case_dom['params']['tolerance'] = 1.0E-3
-#    npipes = case_dom['params']['npipes']
     nloops = case_dom['params']['nloops']
-
-    # Set (npipes) independent equations.
 
     _logger.debug('5a. Prepare to enter iteration loop')
 
@@ -551,10 +532,10 @@ def solve_network_flows(case_dom):
         a = set_flow_jacobian(case_dom, dq)
         b = set_loop_head_loss(case_dom, dq)
 
-        print('A:')
-        _pp.pprint(a)
-        print('B:')
-        _pp.pprint(b)
+#        print('A:')
+#        _pp.pprint(a)
+#        print('B:')
+#        _pp.pprint(b)
 
         # Call matrix solver
         # Step 6. Solve matrix
@@ -571,38 +552,13 @@ def solve_network_flows(case_dom):
             # force-exit iteration loop
             break
 
-        print('X Vector:\n' + repr(x))
+#        print('X Vector:\n' + repr(x))
         dq -= x
         ssum = sum(abs(x))
 
-        _logger.debug('7. Adjust matrix')
-
-#        for ipipe, currpipe in enumerate(case_dom['pipe']):
-#            if nct > 0:
-#                qm = 0.5 * (qpredict[ipipe] + x[ipipe])
-#                ssum += abs(qpredict[ipipe] - x[ipipe])
-#            else:
-#                qm = x[ipipe]
-#
-#            _logger.debug('  Pipe {0:d} Kp is updated to {1:0.4E}'
-#                          .format(ipipe, currpipe['kp']))
-
-        _logger.debug('8. Display interim results')
-        print('Iteration {0:d}'.format(nct))
-        print('Deviation {0:0.4E} (Tolerance {1:0.4E}'
-              .format(ssum, case_dom['params']['tolerance']))
-
-#        print()
-#        print('Pipe   Kp            expp          Qcurrent                  '
-#              'Qpredict')
-#        for ipipe, currpipe in enumerate(case_dom['pipe']):
-#            print('{0:3d}    {1:0.4E}    {2:0.4E}    {3:0.4E~}    {4:0.4E~}'
-#                  .format(ipipe,
-#                          currpipe['kp'],
-#                          currpipe['expp'],
-#                          Q_(x[ipipe], 'm**3/s').to('ft**3/s'),
-#                          Q_(qpredict[ipipe], 'm**3/s').to('ft**3/s')))
-#        print()
+        _logger.debug('7. Display interim results')
+        print('Iteration {:d}: Deviation {:0.4E}, Tolerance {:0.4E}'
+              .format(nct, ssum, case_dom['params']['tolerance']))
 
         update_vol_flows(case_dom, dq)
         set_pipe_head_loss(case_dom, dq)
@@ -631,7 +587,6 @@ def set_pipe_derived_properties(case_dom):
 
     Args:
         case_dom (dict): Pipe network data model"""
-#    ugrav = Q_(sc.g, 'm/s**2')
 
     for currpipe in case_dom['pipe']:
         currpipe['loopdir'] = {}
@@ -718,49 +673,6 @@ def flow_and_head_loss_report(case_dom):
     return outstr
 
 
-def create_topology_dotfile(case_dom, filepath='tmp.gv'):
-    """Create directed graph in GraphViz ``dot`` format
-
-    Args:
-        case_dom (dict): Pipe network data model
-        filepath (str): Absolute path of dotfile"""
-
-    jfmt = 'J{:d}'
-    jxfmt = 'JX{:d}'
-#    pfmt = 'P{:d}'
-    pqfmt = 'P{:d}: {:0.1f~}'
-
-    G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
-
-    for idx, inflow in enumerate(case_dom['inflows']):
-        jtag = jfmt.format(idx)
-        jxtag = jxfmt.format(idx)
-        G.add_node(jtag, shape='circle', label=jtag)
-        if inflow.magnitude > 0.0:
-            G.add_node(jxtag, shape='none', label='')
-            G.add_edge(jxfmt.format(idx), jtag, color='blue',
-                       label='{:0.1f~}'.format(inflow))
-        elif inflow.magnitude < 0.0:
-            G.add_node(jxtag, shape='none', label='')
-            G.add_edge(jtag, jxfmt.format(idx), color='red',
-                       label='{:0.1f~}'.format(abs(inflow)))
-
-    for idx, link in enumerate(case_dom['pipe']):
-        pqtag = pqfmt.format(idx, link['vol_flow'])
-        jfrom = jfmt.format(link['from'])
-        jto = jfmt.format(link['to'])
-        G.add_edge(jfrom, jto, label=pqtag)
-
-    dotfn = abspath(filepath)
-    basepath, ext = splitext(dotfn)
-    pngpath = abspath(basepath + '.png')
-    _logger.debug('Writing png to {:s}'.format(pngpath))
-    G.write(dotfn)
-    G.draw(path=pngpath, prog='dot')
-
-    return
-
-
 def main(args):
     """Main entry point allowing external calls
 
@@ -818,10 +730,8 @@ def main(args):
             # Step 10. Display results
             _logger.debug('10. Display final results')
 
+            print('\nFinal results:\n')
             print(flow_and_head_loss_report(case_dom))
-#
-#            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
-#            create_topology_dotfile(case_dom, dotfn)
 
 #            print('case_dom:')
 #            _pp.pprint(case_dom)
