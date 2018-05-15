@@ -17,20 +17,19 @@ import argparse
 # from collections import namedtuple, OrderedDict
 import logging
 import pprint
-from math import copysign, log
+from math import copysign
 from os.path import abspath, splitext
 import sys
 
 # import iapws
 import scipy.constants as sc
 # from fluids.core import Reynolds
-from fluids.friction import friction_factor
 import numpy as np
 import pygraphviz as pgv
 
 from . import _logger, Q_
 from jeppson.input import InputLine
-from jeppson.constants import ahws_us, eshw, echw, edhw
+from jeppson.constants import ahws_us, echw, edhw
 
 from jeppson import __version__
 
@@ -284,7 +283,7 @@ def extract_pumps(deck, iptr, npumps):
 
         _logger.debug('Pump {0:d} curve is {1:0.4E~} Q**2 + ({2:0.4E~}) Q + '
                       '{3:0.4E~}, {4:s} flow along pipe {5:d}'
-                      .format(ipump, 
+                      .format(ipump,
                               currpump['a'],
                               currpump['b'],
                               currpump['h0'],
@@ -404,7 +403,7 @@ def update_vol_flows(case_dom, dq):
         currpipe['vol_flow'] = currpipe['init_vol_flow']
         for iloop, flow_dir in currpipe['loopdir'].items():
             currpipe['vol_flow'] += Q_(flow_dir * dq[iloop], 'ft**3/s')
-        
+
 
 def set_loop_head_loss(case_dom, dq):
     """Find total head loss around a pipe loop
@@ -423,8 +422,8 @@ def set_loop_head_loss(case_dom, dq):
             qabs = abs(currpipe['vol_flow'].to('ft**3/s').magnitude)
             qsgn = copysign(1.0, currpipe['vol_flow'].magnitude)
 
-            b[iloop] += looppipe['flow_dir'] * currpipe['kp'] \
-                        * qsgn * qabs**echw
+            b[iloop] += (looppipe['flow_dir'] * currpipe['kp']
+                         * qsgn * qabs**echw)
 
     if case_dom['params']['npseudoloops'] > 0:
         for psloop in case_dom['pseudoloop']:
@@ -439,10 +438,10 @@ def set_loop_head_loss(case_dom, dq):
                     pid = pump['pipe_id']
                     if pid not in pipelist:
                         continue
-                    pipedir = 0
-                    for looppipe in case_dom['loop'][iloop]:
-                        if looppipe['pipe_id'] == pid:
-                            pipedir = looppipe['flow_dir']
+#                    pipedir = 0
+#                    for looppipe in case_dom['loop'][iloop]:
+#                        if looppipe['pipe_id'] == pid:
+#                            pipedir = looppipe['flow_dir']
                     currpipe = case_dom['pipe'][pid]
                     qi = currpipe['init_vol_flow'].to('ft**3/s').magnitude
                     qcfs = abs(qi * pump['flow_dir'] + dq[iloop])
@@ -476,9 +475,8 @@ def set_flow_jacobian(case_dom, dq):
 
             for jloop in currpipe['loopdir']:
                 a[iloop, jloop] += (currpipe['loopdir'][jloop]
-                                   * echw * looppipe['flow_dir']
-                                   * currpipe['kp'] * abs(q)**(echw - 1.0))
-
+                                    * echw * looppipe['flow_dir']
+                                    * currpipe['kp'] * abs(q)**(echw - 1.0))
 
     if case_dom['params']['npseudoloops'] > 0:
         for psloop in case_dom['pseudoloop']:
@@ -492,18 +490,18 @@ def set_flow_jacobian(case_dom, dq):
                     pid = pump['pipe_id']
                     if pid not in pipelist:
                         continue
-                    pipedir = 0
+#                    pipedir = 0
 #                    for looppipe in case_dom['loop'][iloop]:
 #                        if looppipe['pipe_id'] == pid:
 #                            pipedir = looppipe['flow_dir']
                     currpipe = case_dom['pipe'][pid]
-                    pipedir = currpipe['loopdir'][iloop]
+#                    pipedir = currpipe['loopdir'][iloop]
                     qi = currpipe['init_vol_flow'].to('ft**3/s').magnitude
                     qcfs = abs(qi * pump['flow_dir'] + dq[iloop])
                     q = Q_(qcfs, 'ft**3/s')
 #                    hp = ((pump['a'] * q) + pump['b']) * q + pump['h0']
                     dhp = (2.0 * pump['a'] * q + pump['b']) \
-                          .to('sec/ft**2').magnitude
+                        .to('sec/ft**2').magnitude
 #                    b[iloop] -= pump['flow_dir'] * hp.to('ft').magnitude
 #                    LLP is a pipe ID, not a loop ID - how does this work?
 #                    a[iloop,LLP(IK)] += pump['flow_dir'] * dhp
@@ -524,11 +522,11 @@ def solve_network_flows(case_dom):
         ValueError: Network solution matrix is singular or does not converge.
     """
 
-    ugrav = Q_(sc.g, 'm/s**2')
+#    ugrav = Q_(sc.g, 'm/s**2')
     nct = 0
     ssum = 0.0
     case_dom['params']['tolerance'] = 1.0E-3
-    npipes = case_dom['params']['npipes']
+#    npipes = case_dom['params']['npipes']
     nloops = case_dom['params']['nloops']
 
     # Set (npipes) independent equations.
@@ -633,7 +631,7 @@ def set_pipe_derived_properties(case_dom):
 
     Args:
         case_dom (dict): Pipe network data model"""
-    ugrav = Q_(sc.g, 'm/s**2')
+#    ugrav = Q_(sc.g, 'm/s**2')
 
     for currpipe in case_dom['pipe']:
         currpipe['loopdir'] = {}
