@@ -3,7 +3,7 @@ jeppson-python
 ==============
 
 
-Pipe network flow analysis toolkit
+Pipe network flow analysis toolkit based on the work of Roland W. Jeppson.
 
 
 Description
@@ -27,14 +27,41 @@ original Fortran applications described in the Jeppson texts:
 * ``jeppson_ch6b`` - Newton-Raphson solver which generates corrective loop flows
 * ``jeppson_ch7`` - Hardy Cross method pipe network flow solver
 
-
 Each program takes the same input file structure as its Fortran equivalent and
 generates the same results, though the output format may differ substantially
 from the original Fortran application.
 
+The original Fortran applications were recovered and modernized in a separate
+project, located at https://bitbucket.org/apthorpe/jeppson_pipeflow A brief
+description of the recovery process and a whitepaper summarizing the insights
+gained from the recovery and modernization work can be found at
+https://www.linkedin.com/pulse/case-study-revitalizing-legacy-engineering-jeppson-pipe-bob-apthorpe/
+
+Consider this project to be thematically related, demonstrating the
+implementation of these programs in Python.
+
+
+Disclaimer
+==========
+
+
+This software is provided as an educational resource and no warranty is made to
+its accuracy or suitability for engineering use, especially in any use
+involving protection of human life and environmental quality. *Caveat utilitor!*
+
 
 Design Information
 ==================
+
+
+The underlying theory of operation and input file format description for each
+of the applications can be found in the appropriate chapter of the Jeppson
+documents, for example http://digitalcommons.usu.edu/water_rep/300
+
+All command-line applications support the ``-v`` and ``-vv`` flags to increase
+the verbosity of diagnostic information shown. This is implemented via Python's
+standard logging module. Logging is extended to the underlying libraries
+(jeppson.input).
 
 All programs make use of the InputLine class (in jeppson.input) for tokenizing
 input lines and differentiating between blank, comment, and input data lines.
@@ -72,13 +99,77 @@ storage allow for more direct, more obvious access to data which (ideally)
 makes the underlying theory of each program much clearer. Additionally, since
 Python data structures are flexible, this should result in reduced memory use.
 
-In programs jeppson_ch5, jeppson_ch6a, and jeppson_ch7, the pygraphviz library
-was used to generate flow topology diagrams for displaying results and
-validating input.
+An object-oriented approach toward the full application was not taken since
+there was little chance of code reuse. A data model was defined specifically
+for each of the network flow solver programs (jeppson_ch5, jeppson_ch6a,
+jeppson_ch6b, and jeppson_ch7). The data models have similar sections and
+overal structure, but they are not interchangeable. Example data models for
+each network flow solver can be found in the ``userdoc`` directory.
+
+In programs jeppson_ch5 and jeppson_ch6a, the pygraphviz library was used to
+generate flow topology diagrams for displaying results and validating input. At
+present the diagram layout and quantitative elements need tuning to improve
+presentation, however diagrams are complete and accurate with respect to
+topology, pressure and flow display, inflows, outflows, and flow direction.
+
+Unit testing is applied principally to object-oriented components, mainly
+the Pipe class in jeppson.pipe and the InputLine class in jeppson.input.
+Integral testing was used to manually compare the Python applications with the
+original Fortran applications. Had the applications been designed as objects,
+unit testing would have been a more reasonable choice since it can easily be
+automated. The choice of application architecture makes the individual programs
+rather difficult to test; a more modular or object-oriented design would
+simplify testing but would also complicate implementation. In this case, the
+decision was to go with a simpler application architecture and trade ease of
+implementation for ease of testing. This is reasonable in a prototype or
+demonstrator application such as this; it may not be appropriate for other
+application roles and use cases.
 
 
-Note
-====
+Possible Future Work
+====================
+
+
+Add GraphViz support for all network solvers
+--------------------------------------------
+
+Adding GraphViz support for the ``jeppson_ch5`` and ``jeppson_ch6a``
+applications was straightforward since the data model for these solvers
+included lists of pipes and the junctions which connect them.
+GraphViz support for ``jeppson_ch6b`` and ``jeppson_ch7`` programs is
+complicated since junctions are not explicitly enumerated; instead, a list of
+pipes and flow loops comprised of pipes are provided. Generating and
+enumerating a list of connecting junctions from loop data is a fairly involved
+process.
+
+Data serialization
+------------------
+
+Serializing the case_dom data model used in the network flow solvers in a
+format such as YAML or JSON would simplify post-processing the code results.
+
+Structured input
+----------------
+
+Converting from free-form text input to a serialized input format such as JSON
+or YAML would allow the code to be driven with a different user interface (e.g.
+web, desktop GUI)
+
+The case_dom data structure may be more useful if converted to several
+independent Pandas data frames, then joined or queried in order to simplify
+data access. This may be useful both for matrix and vector construction while
+solving for network flows or for post-processing, analysis, and visualization.
+
+Improved data visualization
+---------------------------
+
+The network flow solvers produce a conservative directed graph of volumetric
+flow, ideal for representation in a Sankey plot; see
+https://www.sciencedirect.com/science/article/pii/S0921344917301167?via%3Dihub
+
+
+Development Note
+================
 
 
 This project has been set up using PyScaffold 3.0.3 via
