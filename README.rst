@@ -83,19 +83,18 @@ software, the project serves to demonstrate the use and limitations of
 unit-aware physical computing.
 
 Finally, a goal in rewriting the network flow solvers was to iteratively refine
-a common solution method or application 'template' which might suggest common
-elements, structures, or methods which could be extracted into resuable
-components. It was not clear at the outset if a flow solver object model would
-suggest itself in the course of writing the Python applications so this project
-was partly intended to find code duplicated between applications which could be
-refactored into independent objects or libraries. Rather than proposing an
-object model early in the project which may or may not serve the application,
-the applications were intentionally developed in a 'naive' manner, hoping
-similarities between them would suggest evolutionary refactoring and
-componentization. This allowed focus to be put primarily on generating correct
-results, secondarily on object-oriented design. This focus allowed for rapid
-development and provided test cases to detect any errors which appeared during
-refactoring.
+and 'standardize' applications to find common elements, structures, or methods
+which could be extracted into resuable components. It was not clear at the
+outset if a flow solver object model would suggest itself in the course of
+writing the Python applications so this project was partly intended to find
+code duplicated between applications which could be refactored into independent
+objects or libraries. Rather than proposing an object model early in the
+project which may or may not serve the application, the applications were
+intentionally developed in a 'naive' manner, hoping similarities between them
+would suggest evolutionary refactoring and componentization. This allowed focus
+to be put primarily on generating correct results, secondarily on
+object-oriented design. This focus allowed for rapid development and provided
+test cases to detect any errors which appeared during refactoring.
 
 
 Design Information
