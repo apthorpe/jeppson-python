@@ -47,7 +47,55 @@ Disclaimer
 
 This software is provided as an educational resource and no warranty is made to
 its accuracy or suitability for engineering use, especially in any use
-involving protection of human life and environmental quality. *Caveat utilitor!*
+involving protection of human life and environmental quality. *Caveat
+utilitor!*
+
+
+Project Goals
+=============
+
+The primary goals of this project were to write Python equivalents to the six
+command-line interface (CLI) applications described in *Steady Flow Analysis of
+Pipe Networks: An Instructional Manual* (1974) and *Analysis of Flow in Pipe
+Networks* (1976); see above. The programs should be able to process the input
+files used by the original Fortran applicaitons and should produce (at minimum)
+the same output (content, precision, accuracy). The Python applications should
+be written in standard Python idiom (i.e. should not be a transliteration of
+the original Fortran into Python), and should demonstrate the use of diagnostic
+logging, standard CLI argument and option processing, error- and exception
+handling, and user-centric error messages. If possible, pipe network topology
+and pipe flows should be presented visually using GraphViz -
+https://www.graphviz.org/
+
+The Python applications are not required to follow the implementation methods
+used in the original Fortran; it is expected that full advantage will be taken
+of Python's data structures and coding constructs as well as standard and
+third-party libraries.
+
+Similarly, the output produced by the Python applications may vary
+substantially from the original Fortran applications provided the same content
+may be found in the output of the new applications.
+
+A major goal is to demonstrate the use of the Pint unit conversion and physical
+quantity library. Since poor unit conversion and specification have led to a
+number of dramatic and expensive failures of mission- and safety-critical
+software, the project serves to demonstrate the use and limitations of
+unit-aware physical computing.
+
+Finally, a goal in rewriting the network flow solvers was to iteratively refine
+a common solution method or application 'template' which might suggest common
+elements, structures, or methods which could be extracted into resuable
+components. It was not clear at the outset if a flow solver object model would
+suggest itself in the course of writing the Python applications so this project
+was partly intended to find code duplicated between applications which could be
+refactored into independent objects or libraries. Rather than proposing an
+object model early in the project which may or may not serve the application,
+the applications were intentionally developed in a 'naive' manner, hoping
+similarities between them would suggest evolutionary refactoring and
+componentization. This allowed focus to be put primarily on generating correct
+results, secondarily on object-oriented design. This focus allowed for rapid
+development and provided test cases to detect any errors which appeared during
+refactoring.
 
 
 Design Information
@@ -166,6 +214,34 @@ Improved data visualization
 The network flow solvers produce a conservative directed graph of volumetric
 flow, ideal for representation in a Sankey plot; see
 https://www.sciencedirect.com/science/article/pii/S0921344917301167?via%3Dihub
+
+
+Documentation
+=============
+
+The code has been developed with the intent of using Sphinx as the project
+documentation processor; http://www.sphinx-doc.org/en/master/ All files,
+classes, and functions should have the appropriate docstring present. Functions
+will additionally describe required and optional arguments, return values, and
+exceptions raised, if any.
+
+Documentation of the code theory or input format are available in the original
+Jeppson documents and are not repeated here. This is considered reasonable
+since this project is part of a larger whole based on Jeppson's original
+texts.
+
+
+Testing
+=======
+
+Testing is discussed near the end of the *Design Information* section. Unit
+testing has been used extensively on component classes (InputLine and Pipe
+classes). The command-line applications are primarily tested via integral
+testing to ensure existing input files may be read and results of the original
+and Python applications are comparable and reasonably close (within 5-10%).
+Identical numerical results are not expected due to differences in precision
+and calculational method. Note the discussion of design trade-offs and ease of
+testing in the *Design Information* section.
 
 
 Development Note
