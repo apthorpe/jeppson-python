@@ -31,42 +31,47 @@ __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
+#: Nomenclature is a named tuple which stores a short variable name ('tag'), a
+#: longger string description, and Pint unit specifiers in the 'mks_units' and
+#: 'us_units' fields.
 Nomenclature = namedtuple('Nomenclature',
                           ['tag', 'description', 'mks_units', 'us_units'])
 
+#: idataprop is an ordered dictionary of Nomenclature named tuples which serve
+#: as a directory of input data fields, conversion factors, and documentation.
 idataprop = OrderedDict([
     ('idiameter',  Nomenclature('idiameter',
                                 'pipe inner diameter',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('vol_flow',   Nomenclature('vol_flow',
                                 'volumetric flowrate',
-                                ureg.meter**3 / ureg.second,
-                                ureg.foot**3 / ureg.second)),
+                                'm**3 / s',
+                                'ft**3 / s')),
     ('lpipe',      Nomenclature('lpipe',
                                 'pipe length',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('kin_visc',   Nomenclature('kin_visc',
                                 'kinematic viscosity',
-                                ureg.meter**2 / ureg.second,
-                                ureg.foot**2 / ureg.second)),
+                                'm**2 / s',
+                                'ft**2 / s')),
     ('froughness', Nomenclature('froughness',
                                 'absolute pipe roughness',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('grav',       Nomenclature('grav',
                                 'gravitational acceleration',
-                                ureg.meter/ureg.second**2,
-                                ureg.foot/ureg.second**2)),
+                                'm / s**2',
+                                'ft / s**2')),
     ('flow_area',  Nomenclature('flow_area',
                                 'pipe flow area',
-                                ureg.meter**2,
-                                ureg.foot**2)),
+                                'm**2',
+                                'ft**2')),
     ('vflow',      Nomenclature('vflow',
                                 'flow velocity',
-                                ureg.meter/ureg.second,
-                                ureg.foot/ureg.second)),
+                                'm / s',
+                                'ft / s')),
     ('Re',         Nomenclature('Re',
                                 'reynolds number',
                                 ureg.parse_expression('dimensionless'),
@@ -77,14 +82,16 @@ idataprop = OrderedDict([
                                 ureg.parse_expression('dimensionless'))),
     ('head_loss',  Nomenclature('head_loss',
                                 'head loss',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('friction',   Nomenclature('friction',
                                 'darcy-weisback friction factor',
                                 ureg.parse_expression('dimensionless'),
                                 ureg.parse_expression('dimensionless')))
 ])
 
+#: inputconv_us is an ordered dictionary of input variable tags and US
+#: Traditional units used for assigning units to input quantities.
 inputconv_us = OrderedDict([
     ('idiameter',  'ft'),
     ('vol_flow',   'ft**3/s'),
@@ -94,6 +101,8 @@ inputconv_us = OrderedDict([
     ('grav',       'ft/s**2')
 ])
 
+#: inputconv_us is an ordered dictionary of input variable tags and SI units
+#: used for assigning units to input quantities.
 inputconv_mks = OrderedDict([
     ('idiameter',  'm'),
     ('vol_flow',   'm**3/s'),
@@ -103,6 +112,7 @@ inputconv_mks = OrderedDict([
     ('grav',       'm/s**2')
 ])
 
+#: ikeys is a sorted list of input variable tags
 ikeys = inputconv_us.keys()
 
 
