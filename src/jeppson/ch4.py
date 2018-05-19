@@ -234,14 +234,14 @@ def pipe_friction(vol_flow, idiameter, kin_visc, flow_area, eroughness):
     """Calculate friction factor from pipe geometry, flow conditions, and fluid
     properties. Input values should be supplied in a consistent unit system
     (all SI or all US Traditional)
-    
+
     Args:
         vol_flow (float): Volumetric flow
         idiameter (float): Pipe inner diameter
         kin_visc (float): Fluid kinematic viscosity
         flow_area (float): Pipe flow area
         eroughness (float): Relative pipe roughness.
-        
+
     Returns:
         (float): Darcy-Weisbach friction factor"""
     vflow = vol_flow / flow_area
@@ -256,9 +256,9 @@ def pipe_friction(vol_flow, idiameter, kin_visc, flow_area, eroughness):
 def generate_results(idata):
     """ Generate intermediate quantities and modeling
     coeffcients for incompressible pipe flow cases
-    
+
     Args:
-        idata (dict): Dict containing pipe geometry, fluid properties, 
+        idata (dict): Dict containing pipe geometry, fluid properties,
           flow conditions, and model parameters
 
     Returns:

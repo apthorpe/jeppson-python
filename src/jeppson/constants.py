@@ -7,13 +7,7 @@ correlation is *dimensional*, not dimensionless. This requires particular care
 when selecting leading coefficients for the flow and head loss
 correrlations."""
 
-from __future__ import absolute_import, division, print_function
-
-import logging
-
-from . import _logger, ureg, Q_
-
-from jeppson import __version__
+# from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
