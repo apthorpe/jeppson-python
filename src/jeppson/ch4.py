@@ -19,12 +19,10 @@ import logging
 from math import isnan, log
 import sys
 
-# import iapws
 import scipy.constants as sc
 from fluids.friction import friction_factor
 
 from . import _logger, ureg, Q_
-# from jeppson.pipe import Pipe
 from jeppson.input import InputLine
 from jeppson import __version__
 
@@ -32,47 +30,52 @@ __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
+#: Nomenclature is a named tuple which stores a short variable name ('tag'), a
+#: longger string description, and Pint unit specifiers in the 'mks_units' and
+#: 'us_units' fields.
 Nomenclature = namedtuple('Nomenclature',
                           ['tag', 'description', 'mks_units', 'us_units'])
 
+#: idataprop is an ordered dictionary of Nomenclature named tuples which serve
+#: as a directory of input data fields, conversion factors, and documentation.
 idataprop = OrderedDict([
     ('vol_flow',   Nomenclature('vol_flow',
                                 'volumetric flowrate',
-                                ureg.meter**3 / ureg.second,
-                                ureg.foot**3 / ureg.second)),
+                                'm**3 / s',
+                                'ft**3 / s')),
     ('idiameter',  Nomenclature('idiameter',
                                 'pipe inner diameter',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('lpipe',      Nomenclature('lpipe',
                                 'pipe length',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('froughness', Nomenclature('froughness',
                                 'absolute pipe roughness',
-                                ureg.meter,
-                                ureg.foot)),
+                                'm',
+                                'ft')),
     ('fvol_flow',  Nomenclature('fvol_flow',
                                 'fractional volumetric flow',
                                 ureg.parse_expression('dimensionless'),
                                 ureg.parse_expression('dimensionless'))),
     ('kin_visc',   Nomenclature('kin_visc',
                                 'kinematic viscosity',
-                                ureg.meter**2 / ureg.second,
-                                ureg.foot**2 / ureg.second)),
+                                'm**2 / s',
+                                'ft**2 / s')),
     ('flow_area',  Nomenclature('flow_area',
                                 'pipe flow area',
-                                ureg.meter**2,
-                                ureg.foot**2)),
+                                'm**2',
+                                'ft**2')),
     ('arl',        Nomenclature('arl',
                                 'power law model constant term',
-                                ureg.second**2 / ureg.meter**5,
-                                ureg.second**2 / ureg.feet**5
+                                's**2 / m**5',
+                                's**2 / ft**5'
                                 )),
     ('dvol_flow',  Nomenclature('dvol_flow',
                                 'volumentric flowrate deviation',
-                                ureg.meter**3 / ureg.second,
-                                ureg.foot**3 / ureg.second)),
+                                'm**3 / s',
+                                'ft**3 / s')),
     ('eroughness', Nomenclature('eroughness',
                                 'relative pipe roughness',
                                 ureg.parse_expression('dimensionless'),
@@ -83,6 +86,8 @@ idataprop = OrderedDict([
                                 ureg.parse_expression('dimensionless')))
 ])
 
+#: inputconv is an ordered dictionary of input variable tags and US
+#: Traditional units used for assigning units to input quantities.
 inputconv = OrderedDict([
     ('vol_flow',   'ft**3/s'),
     ('idiameter',  'in'),
@@ -91,6 +96,7 @@ inputconv = OrderedDict([
     ('fvol_flow',  ''),
     ('kin_visc',   'ft**2/s')])
 
+#: ikeys is a sorted list of input variable tags
 ikeys = inputconv.keys()
 
 
@@ -225,7 +231,19 @@ def extract_case_input(iline, force_units=None):
 
 
 def pipe_friction(vol_flow, idiameter, kin_visc, flow_area, eroughness):
-    """Calculate friction factor from """
+    """Calculate friction factor from pipe geometry, flow conditions, and fluid
+    properties. Input values should be supplied in a consistent unit system
+    (all SI or all US Traditional)
+    
+    Args:
+        vol_flow (float): Volumetric flow
+        idiameter (float): Pipe inner diameter
+        kin_visc (float): Fluid kinematic viscosity
+        flow_area (float): Pipe flow area
+        eroughness (float): Relative pipe roughness.
+        
+    Returns:
+        (float): Darcy-Weisbach friction factor"""
     vflow = vol_flow / flow_area
     Re = vflow * idiameter / kin_visc
     friction = friction_factor(Re=Re, eD=eroughness)
@@ -237,7 +255,17 @@ def pipe_friction(vol_flow, idiameter, kin_visc, flow_area, eroughness):
 
 def generate_results(idata):
     """ Generate intermediate quantities and modeling
-    coeffcients for incompressible pipe flow cases"""
+    coeffcients for incompressible pipe flow cases
+    
+    Args:
+        idata (dict): Dict containing pipe geometry, fluid properties, 
+          flow conditions, and model parameters
+
+    Returns:
+        ([dict]): Pair of dicts containing derived and output data describing
+        flow and pressure conditions as well as intermediate values used in
+        calculations
+    """
     ugrav = Q_(sc.g, "m/s**2")
 
     # Results

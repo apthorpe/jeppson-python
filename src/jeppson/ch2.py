@@ -19,7 +19,6 @@ import logging
 from math import isnan
 import sys
 
-# import iapws
 import scipy.constants as sc
 from fluids.friction import friction_factor
 
