@@ -1,0 +1,360 @@
+Pipe    Diameter         Length         CHW
+  0     1.0000E+01 in    1.0000E+03 ft  120.000
+  1     8.0000E+00 in    1.5000E+03 ft  120.000
+  2     8.0000E+00 in    2.0000E+03 ft  120.000
+  3     8.0000E+00 in    2.0000E+03 ft  120.000
+  4     8.0000E+00 in    1.5000E+03 ft  120.000
+  5     1.0000E+01 in    2.0000E+03 ft  120.000
+  6     8.0000E+00 in    2.0000E+03 ft  120.000
+  7     6.0000E+00 in    3.0000E+03 ft  120.000
+  8     1.0000E+01 in    2.0000E+03 ft  120.000
+
+
+Flow reversal detected in pipe 4 from 4 to 3
+Flow reversal detected in pipe 7 from 4 to 6
+Flow reversal detected in pipe 8 from 5 to 6
+
+Iteration 0
+Deviation 5.0664E+01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8210E+00 ft    6.7925E+00 ft ** 3 / s
+  1    7.2152E+00    1.2401E+00 ft    4.2659E-01 ft ** 3 / s
+  2    9.6202E+00    2.9648E+01 ft    8.7314E+00 ft ** 3 / s
+  3    9.6202E+00    2.3588E+01 ft    6.9467E+00 ft ** 3 / s
+  4    7.2152E+00    4.8200E+00 ft    1.6580E+00 ft ** 3 / s
+  5    3.2449E+00    3.8313E+00 ft    2.0291E+00 ft ** 3 / s
+  6    9.6202E+00    4.3241E+00 ft    1.2734E+00 ft ** 3 / s
+  7    5.8583E+01    9.8869E-01 ft    1.0976E-01 ft ** 3 / s
+  8    3.2449E+00    5.3128E+00 ft    2.8137E+00 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9118E+02 ft
+  2         1.8994E+02 ft
+  3         1.6635E+02 ft
+  4         1.6153E+02 ft
+  5         1.5721E+02 ft
+  6         1.6252E+02 ft
+
+Flow reversal detected in pipe 4 from 3 to 4
+Flow reversal detected in pipe 7 from 6 to 4
+Flow reversal detected in pipe 8 from 6 to 5
+
+Iteration 1
+Deviation 1.9211E+01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8530E+00 ft    6.8171E+00 ft ** 3 / s
+  1    7.2152E+00    3.4587E+00 ft    1.1898E+00 ft ** 3 / s
+  2    9.6202E+00    2.6778E+01 ft    7.8859E+00 ft ** 3 / s
+  3    9.6202E+00    2.7264E+01 ft    8.0292E+00 ft ** 3 / s
+  4    7.2152E+00    3.9453E+00 ft    1.3572E+00 ft ** 3 / s
+  5    3.2449E+00    4.8128E+00 ft    2.5489E+00 ft ** 3 / s
+  6    9.6202E+00    5.9079E+00 ft    1.7399E+00 ft ** 3 / s
+  7    5.8583E+01    8.7582E+00 ft    9.7234E-01 ft ** 3 / s
+  8    3.2449E+00    2.8503E+00 ft    1.5095E+00 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8769E+02 ft
+  3         1.6042E+02 ft
+  4         1.6437E+02 ft
+  5         1.5846E+02 ft
+  6         1.5561E+02 ft
+
+Flow reversal detected in pipe 4 from 4 to 3
+Flow reversal detected in pipe 8 from 5 to 6
+
+Iteration 2
+Deviation 1.1354E+01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.4035E+00 ft    1.1708E+00 ft ** 3 / s
+  2    9.6202E+00    2.9499E+01 ft    8.6874E+00 ft ** 3 / s
+  3    9.6202E+00    2.4716E+01 ft    7.2786E+00 ft ** 3 / s
+  4    7.2152E+00    1.3802E+00 ft    4.7476E-01 ft ** 3 / s
+  5    3.2449E+00    5.7130E+00 ft    3.0256E+00 ft ** 3 / s
+  6    9.6202E+00    7.4557E+00 ft    2.1957E+00 ft ** 3 / s
+  7    5.8583E+01    4.3328E+00 ft    4.8103E-01 ft ** 3 / s
+  8    3.2449E+00    3.1229E+00 ft    1.6539E+00 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8774E+02 ft
+  3         1.6303E+02 ft
+  4         1.6165E+02 ft
+  5         1.5419E+02 ft
+  6         1.5731E+02 ft
+
+Flow reversal detected in pipe 4 from 3 to 4
+Flow reversal detected in pipe 8 from 6 to 5
+
+Iteration 3
+Deviation 8.4781E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.8880E+00 ft    1.3374E+00 ft ** 3 / s
+  2    9.6202E+00    2.8035E+01 ft    8.2562E+00 ft ** 3 / s
+  3    9.6202E+00    2.6179E+01 ft    7.7096E+00 ft ** 3 / s
+  4    7.2152E+00    2.0320E+00 ft    6.9898E-01 ft ** 3 / s
+  5    3.2449E+00    5.6944E+00 ft    3.0158E+00 ft ** 3 / s
+  6    9.6202E+00    6.2679E+00 ft    1.8459E+00 ft ** 3 / s
+  7    5.8583E+01    7.7264E+00 ft    8.5778E-01 ft ** 3 / s
+  8    3.2449E+00    1.4585E+00 ft    7.7241E-01 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8726E+02 ft
+  3         1.6108E+02 ft
+  4         1.6311E+02 ft
+  5         1.5684E+02 ft
+  6         1.5539E+02 ft
+
+Flow reversal detected in pipe 4 from 4 to 3
+Flow reversal detected in pipe 8 from 5 to 6
+
+Iteration 4
+Deviation 6.0534E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.5411E+00 ft    1.2181E+00 ft ** 3 / s
+  2    9.6202E+00    2.9103E+01 ft    8.5707E+00 ft ** 3 / s
+  3    9.6202E+00    2.5180E+01 ft    7.4155E+00 ft ** 3 / s
+  4    7.2152E+00    3.8156E-01 ft    1.3125E-01 ft ** 3 / s
+  5    3.2449E+00    5.7541E+00 ft    3.0474E+00 ft ** 3 / s
+  6    9.6202E+00    7.2070E+00 ft    2.1224E+00 ft ** 3 / s
+  7    5.8583E+01    5.3726E+00 ft    5.9646E-01 ft ** 3 / s
+  8    3.2449E+00    1.8345E+00 ft    9.7154E-01 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8761E+02 ft
+  3         1.6243E+02 ft
+  4         1.6204E+02 ft
+  5         1.5484E+02 ft
+  6         1.5667E+02 ft
+
+Flow reversal detected in pipe 4 from 3 to 4
+Flow reversal detected in pipe 8 from 6 to 5
+
+Iteration 5
+Deviation 3.9993E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.7405E+00 ft    1.2867E+00 ft ** 3 / s
+  2    9.6202E+00    2.8520E+01 ft    8.3991E+00 ft ** 3 / s
+  3    9.6202E+00    2.5743E+01 ft    7.5811E+00 ft ** 3 / s
+  4    7.2152E+00    9.6297E-01 ft    3.3125E-01 ft ** 3 / s
+  5    3.2449E+00    5.9393E+00 ft    3.1455E+00 ft ** 3 / s
+  6    9.6202E+00    6.2814E+00 ft    1.8498E+00 ft ** 3 / s
+  7    5.8583E+01    6.9023E+00 ft    7.6629E-01 ft ** 3 / s
+  8    3.2449E+00    6.2090E-01 ft    3.2883E-01 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8741E+02 ft
+  3         1.6166E+02 ft
+  4         1.6263E+02 ft
+  5         1.5635E+02 ft
+  6         1.5572E+02 ft
+
+Flow reversal detected in pipe 8 from 5 to 6
+
+Iteration 6
+Deviation 2.5502E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6212E+00 ft    1.2457E+00 ft ** 3 / s
+  2    9.6202E+00    2.8886E+01 ft    8.5067E+00 ft ** 3 / s
+  3    9.6202E+00    2.5400E+01 ft    7.4801E+00 ft ** 3 / s
+  4    7.2152E+00    1.3528E-01 ft    4.6534E-02 ft ** 3 / s
+  5    3.2449E+00    5.8111E+00 ft    3.0776E+00 ft ** 3 / s
+  6    9.6202E+00    6.9286E+00 ft    2.0405E+00 ft ** 3 / s
+  7    5.8583E+01    5.9464E+00 ft    6.6017E-01 ft ** 3 / s
+  8    3.2449E+00    9.8222E-01 ft    5.2019E-01 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8753E+02 ft
+  3         1.6213E+02 ft
+  4         1.6226E+02 ft
+  5         1.5533E+02 ft
+  6         1.5631E+02 ft
+
+Flow reversal detected in pipe 8 from 6 to 5
+
+Iteration 7
+Deviation 1.3377E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6509E+00 ft    1.2559E+00 ft ** 3 / s
+  2    9.6202E+00    2.8799E+01 ft    8.4812E+00 ft ** 3 / s
+  3    9.6202E+00    2.5483E+01 ft    7.5047E+00 ft ** 3 / s
+  4    7.2152E+00    3.3530E-01 ft    1.1534E-01 ft ** 3 / s
+  5    3.2449E+00    6.0663E+00 ft    3.2127E+00 ft ** 3 / s
+  6    9.6202E+00    6.2759E+00 ft    1.8482E+00 ft ** 3 / s
+  7    5.8583E+01    6.4016E+00 ft    7.1071E-01 ft ** 3 / s
+  8    3.2449E+00    1.2570E-01 ft    6.6570E-02 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8750E+02 ft
+  3         1.6201E+02 ft
+  4         1.6235E+02 ft
+  5         1.5607E+02 ft
+  6         1.5595E+02 ft
+
+Flow reversal detected in pipe 8 from 5 to 6
+
+Iteration 8
+Deviation 4.8289E-01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6515E+00 ft    1.2561E+00 ft ** 3 / s
+  2    9.6202E+00    2.8798E+01 ft    8.4808E+00 ft ** 3 / s
+  3    9.6202E+00    2.5485E+01 ft    7.5052E+00 ft ** 3 / s
+  4    7.2152E+00    3.3855E-01 ft    1.1646E-01 ft ** 3 / s
+  5    3.2449E+00    5.9220E+00 ft    3.1363E+00 ft ** 3 / s
+  6    9.6202E+00    6.6140E+00 ft    1.9478E+00 ft ** 3 / s
+  7    5.8583E+01    6.2606E+00 ft    6.9505E-01 ft ** 3 / s
+  8    3.2449E+00    3.5342E-01 ft    1.8717E-01 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8750E+02 ft
+  3         1.6201E+02 ft
+  4         1.6235E+02 ft
+  5         1.5574E+02 ft
+  6         1.5609E+02 ft
+
+Iteration 9
+Deviation 2.6438E-01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6550E+00 ft    1.2573E+00 ft ** 3 / s
+  2    9.6202E+00    2.8787E+01 ft    8.4776E+00 ft ** 3 / s
+  3    9.6202E+00    2.5495E+01 ft    7.5082E+00 ft ** 3 / s
+  4    7.2152E+00    3.6321E-01 ft    1.2494E-01 ft ** 3 / s
+  5    3.2449E+00    5.9854E+00 ft    3.1699E+00 ft ** 3 / s
+  6    9.6202E+00    6.4659E+00 ft    1.9042E+00 ft ** 3 / s
+  7    5.8583E+01    6.3486E+00 ft    7.0483E-01 ft ** 3 / s
+  8    3.2449E+00    1.1728E-01 ft    6.2113E-02 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8749E+02 ft
+  3         1.6200E+02 ft
+  4         1.6236E+02 ft
+  5         1.5589E+02 ft
+  6         1.5601E+02 ft
+
+Iteration 10
+Deviation 3.6405E-02 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6546E+00 ft    1.2571E+00 ft ** 3 / s
+  2    9.6202E+00    2.8788E+01 ft    8.4780E+00 ft ** 3 / s
+  3    9.6202E+00    2.5494E+01 ft    7.5078E+00 ft ** 3 / s
+  4    7.2152E+00    3.6012E-01 ft    1.2388E-01 ft ** 3 / s
+  5    3.2449E+00    5.9770E+00 ft    3.1654E+00 ft ** 3 / s
+  6    9.6202E+00    6.4872E+00 ft    1.9105E+00 ft ** 3 / s
+  7    5.8583E+01    6.3371E+00 ft    7.0354E-01 ft ** 3 / s
+  8    3.2449E+00    1.5015E-01 ft    7.9520E-02 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8749E+02 ft
+  3         1.6200E+02 ft
+  4         1.6236E+02 ft
+  5         1.5587E+02 ft
+  6         1.5602E+02 ft
+
+Iteration 11
+Deviation 2.2066E-03 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6546E+00 ft    1.2571E+00 ft ** 3 / s
+  2    9.6202E+00    2.8788E+01 ft    8.4780E+00 ft ** 3 / s
+  3    9.6202E+00    2.5494E+01 ft    7.5078E+00 ft ** 3 / s
+  4    7.2152E+00    3.5991E-01 ft    1.2381E-01 ft ** 3 / s
+  5    3.2449E+00    5.9764E+00 ft    3.1652E+00 ft ** 3 / s
+  6    9.6202E+00    6.4885E+00 ft    1.9108E+00 ft ** 3 / s
+  7    5.8583E+01    6.3364E+00 ft    7.0346E-01 ft ** 3 / s
+  8    3.2449E+00    1.5212E-01 ft    8.0566E-02 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8749E+02 ft
+  3         1.6200E+02 ft
+  4         1.6236E+02 ft
+  5         1.5587E+02 ft
+  6         1.5602E+02 ft
+
+Iteration 12
+Deviation 6.2718E-06 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.8531E+00 ft    6.8172E+00 ft ** 3 / s
+  1    7.2152E+00    3.6546E+00 ft    1.2571E+00 ft ** 3 / s
+  2    9.6202E+00    2.8788E+01 ft    8.4780E+00 ft ** 3 / s
+  3    9.6202E+00    2.5494E+01 ft    7.5078E+00 ft ** 3 / s
+  4    7.2152E+00    3.5991E-01 ft    1.2381E-01 ft ** 3 / s
+  5    3.2449E+00    5.9764E+00 ft    3.1652E+00 ft ** 3 / s
+  6    9.6202E+00    6.4885E+00 ft    1.9108E+00 ft ** 3 / s
+  7    5.8583E+01    6.3364E+00 ft    7.0346E-01 ft ** 3 / s
+  8    3.2449E+00    1.5213E-01 ft    8.0568E-02 ft ** 3 / s
+
+Junction    Head
+  0         2.0000E+02 ft
+  1         1.9115E+02 ft
+  2         1.8749E+02 ft
+  3         1.6200E+02 ft
+  4         1.6236E+02 ft
+  5         1.5587E+02 ft
+  6         1.5602E+02 ft
+
+Final results:
+
+  Pipe  From    To  Diameter         Length         CHW      Volumetric Flow    Head Loss      From Head      To Head
+  0     0       1   1.0000E+01 in    1.0000E+03 ft  120.000  6.817 ft ** 3 / s  8.8531E+00 ft  2.0000E+02 ft  1.9115E+02 ft
+  1     1       2   8.0000E+00 in    1.5000E+03 ft  120.000  1.257 ft ** 3 / s  3.6546E+00 ft  1.9115E+02 ft  1.8749E+02 ft
+  2     1       4   8.0000E+00 in    2.0000E+03 ft  120.000  8.478 ft ** 3 / s  2.8788E+01 ft  1.9115E+02 ft  1.6236E+02 ft
+  3     2       3   8.0000E+00 in    2.0000E+03 ft  120.000  7.508 ft ** 3 / s  2.5494E+01 ft  1.8749E+02 ft  1.6200E+02 ft
+  4     4       3   8.0000E+00 in    1.5000E+03 ft  120.000  0.124 ft ** 3 / s  3.5991E-01 ft  1.6236E+02 ft  1.6200E+02 ft
+  5     3       6   1.0000E+01 in    2.0000E+03 ft  120.000  3.165 ft ** 3 / s  5.9764E+00 ft  1.6200E+02 ft  1.5602E+02 ft
+  6     4       5   8.0000E+00 in    2.0000E+03 ft  120.000  1.911 ft ** 3 / s  6.4885E+00 ft  1.6236E+02 ft  1.5587E+02 ft
+  7     4       6   6.0000E+00 in    3.0000E+03 ft  120.000  0.703 ft ** 3 / s  6.3364E+00 ft  1.6236E+02 ft  1.5602E+02 ft
+  8     6       5   1.0000E+01 in    2.0000E+03 ft  120.000  0.081 ft ** 3 / s  1.5213E-01 ft  1.5602E+02 ft  1.5587E+02 ft
+
+
+Junction  Inflow                  Head
+  0       0.0000E+00 ft ** 3 / s  2.0000E+02 ft  Fixed head
+  1       0.0000E+00 ft ** 3 / s  1.9000E+02 ft  
+  2       1.0000E+00 ft ** 3 / s  1.8000E+02 ft  
+  3       -5.0000E-01 ft ** 3 / s  1.6000E+02 ft  
+  4       -5.0000E-01 ft ** 3 / s  1.7000E+02 ft  
+  5       -1.0000E+00 ft ** 3 / s  1.5000E+02 ft  
+  6       -1.5000E+00 ft ** 3 / s  1.4500E+02 ft  
+

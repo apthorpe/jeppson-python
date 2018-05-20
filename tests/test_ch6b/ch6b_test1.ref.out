@@ -1,0 +1,29 @@
+Pipe    Diameter         Length           CHW
+  0     1.2000E+01 in    2.0000E+03 ft      95.0
+  1     1.0000E+01 in    1.5000E+03 ft      95.0
+  2     6.0000E+00 in    2.0000E+03 ft      95.0
+  3     8.0000E+00 in    1.5000E+03 ft      95.0
+  4     8.0000E+00 in    2.0000E+03 ft      95.0
+  5     6.0000E+00 in    1.0000E+03 ft      95.0
+  6     1.0000E+01 in    2.0000E+03 ft      95.0
+  7     1.0000E+01 in    3.0000E+03 ft      95.0
+
+
+Iteration 0: Deviation 1.8330E+00, Tolerance 1.0000E-03
+Iteration 1: Deviation 1.0892E+00, Tolerance 1.0000E-03
+Iteration 2: Deviation 2.3840E-01, Tolerance 1.0000E-03
+Iteration 3: Deviation 2.2307E-02, Tolerance 1.0000E-03
+Iteration 4: Deviation 1.9017E-04, Tolerance 1.0000E-03
+
+Final results:
+
+Pipe  Flow                     Flow                      Flow                    Head Loss       Head Loss
+  0   1.6176E-01 m ** 3 / s    5.7124E+00 ft ** 3 / s    2.5639E+03 gal / min    1.5811E+01 m    5.1875E+01 ft
+  1   8.0062E-02 m ** 3 / s    2.8274E+00 ft ** 3 / s    1.2690E+03 gal / min    7.8352E+00 m    2.5706E+01 ft
+  2   7.2712E-03 m ** 3 / s    2.5678E-01 ft ** 3 / s    1.1525E+02 gal / min    1.4797E+00 m    4.8548E+00 ft
+  3   7.8063E-02 m ** 3 / s    2.7568E+00 ft ** 3 / s    1.2373E+03 gal / min    2.2167E+01 m    7.2726E+01 ft
+  4   8.1695E-02 m ** 3 / s    2.8850E+00 ft ** 3 / s    1.2949E+03 gal / min    3.2153E+01 m    1.0549E+02 ft
+  5   1.0903E-02 m ** 3 / s    3.8505E-01 ft ** 3 / s    1.7282E+02 gal / min    1.5667E+00 m    5.1401E+00 ft
+  6   1.3068E-01 m ** 3 / s    4.6150E+00 ft ** 3 / s    2.0713E+03 gal / min    2.5884E+01 m    8.4922E+01 ft
+  7   9.9981E-02 m ** 3 / s    3.5308E+00 ft ** 3 / s    1.5847E+03 gal / min    2.3647E+01 m    7.7581E+01 ft
+

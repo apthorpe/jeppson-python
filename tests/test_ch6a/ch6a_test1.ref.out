@@ -1,0 +1,107 @@
+Pipe    Diameter         Length         CHW
+  0     1.0000E+01 in    1.0000E+03 ft  120.000
+  1     1.0000E+01 in    1.5000E+03 ft  120.000
+  2     1.2000E+01 in    1.0000E+03 ft  120.000
+
+
+Flow reversal detected in pipe 2 from 1 to 2
+
+Iteration 0
+Deviation 1.3375E+01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    9.3445E+00 ft    7.1956E+00 ft ** 3 / s
+  1    2.4337E+00    5.9700E+00 ft    3.6931E+00 ft ** 3 / s
+  2    6.6761E-01    3.3746E+00 ft    4.1973E+00 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.0655E+01 ft
+  2         9.4030E+01 ft
+
+Flow reversal detected in pipe 2 from 2 to 1
+
+Iteration 1
+Deviation 7.9192E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    6.4338E+00 ft    4.9542E+00 ft ** 3 / s
+  1    2.4337E+00    1.0978E+01 ft    6.7914E+00 ft ** 3 / s
+  2    6.6761E-01    4.5446E+00 ft    5.6527E+00 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.3566E+01 ft
+  2         8.9022E+01 ft
+
+Flow reversal detected in pipe 2 from 1 to 2
+
+Iteration 2
+Deviation 5.2795E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.9576E+00 ft    6.8977E+00 ft ** 3 / s
+  1    2.4337E+00    8.2228E+00 ft    5.0867E+00 ft ** 3 / s
+  2    6.6761E-01    7.3483E-01 ft    9.1400E-01 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.1042E+01 ft
+  2         9.1777E+01 ft
+
+Flow reversal detected in pipe 2 from 2 to 1
+
+Iteration 3
+Deviation 2.4895E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.0191E+00 ft    6.1750E+00 ft ** 3 / s
+  1    2.4337E+00    9.7738E+00 ft    6.0462E+00 ft ** 3 / s
+  2    6.6761E-01    1.7547E+00 ft    2.1825E+00 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.1981E+01 ft
+  2         9.0226E+01 ft
+
+Iteration 4
+Deviation 1.3795E+00 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.6441E+00 ft    6.6563E+00 ft ** 3 / s
+  1    2.4337E+00    9.0193E+00 ft    5.5795E+00 ft ** 3 / s
+  2    6.6761E-01    3.7515E-01 ft    4.6662E-01 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.1356E+01 ft
+  2         9.0981E+01 ft
+
+Iteration 5
+Deviation 2.1144E-01 (Tolerance 5.0000E-04
+
+Pipe   Kp            Head loss        Volumetric Flow
+  0    1.6224E+00    8.5631E+00 ft    6.5939E+00 ft ** 3 / s
+  1    2.4337E+00    9.1497E+00 ft    5.6602E+00 ft ** 3 / s
+  2    6.6761E-01    5.8659E-01 ft    7.2961E-01 ft ** 3 / s
+
+Junction    Head
+  0         1.0000E+02 ft
+  1         9.1437E+01 ft
+  2         9.0850E+01 ft
+
+Final results:
+
+WARNING: Case 1 did not converge.
+
+  Pipe  From    To  Diameter         Length         CHW      Volumetric Flow    Head Loss      From Head      To Head
+  0     0       1   1.0000E+01 in    1.0000E+03 ft  120.000  6.594 ft ** 3 / s  8.5631E+00 ft  1.0000E+02 ft  9.1437E+01 ft
+  1     0       2   1.0000E+01 in    1.5000E+03 ft  120.000  5.660 ft ** 3 / s  9.1497E+00 ft  1.0000E+02 ft  9.0850E+01 ft
+  2     1       2   1.2000E+01 in    1.0000E+03 ft  120.000  0.730 ft ** 3 / s  5.8659E-01 ft  9.1437E+01 ft  9.0850E+01 ft
+
+
+Junction  Inflow                  Head
+  0       0.0000E+00 ft ** 3 / s  1.0000E+02 ft  Fixed head
+  1       -1.5000E+00 ft ** 3 / s  9.5000E+01 ft  
+  2       -3.0000E+00 ft ** 3 / s  8.5000E+01 ft  
+

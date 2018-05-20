@@ -1,0 +1,52 @@
+Pipe    Diameter         Length           CHW
+  0     1.2000E+01 in    1.0000E+03 ft     130.0
+  1     8.0000E+00 in    1.0000E+03 ft     130.0
+  2     1.0000E+01 in    1.2000E+03 ft     130.0
+  3     1.0000E+01 in    9.0000E+02 ft     130.0
+  4     1.0000E+01 in    1.0000E+03 ft     130.0
+  5     1.0000E+01 in    2.5000E+03 ft     130.0
+  6     8.0000E+00 in    1.0000E+03 ft     130.0
+  7     1.0000E+01 in    1.4000E+03 ft     130.0
+  8     1.2000E+01 in    2.0000E+03 ft     130.0
+  9     8.0000E+00 in    1.2000E+03 ft     130.0
+ 10     8.0000E+00 in    1.3000E+03 ft     130.0
+ 11     1.0000E+01 in    1.6000E+03 ft     130.0
+ 12     1.0000E+01 in    1.0000E+03 ft     130.0
+ 13     1.0000E+01 in    1.3000E+03 ft     130.0
+ 14     1.2000E+01 in    9.0000E+02 ft     130.0
+ 15     1.2000E+01 in    5.0000E+02 ft     130.0
+
+
+Iteration 0: Deviation 9.1704E+00, Tolerance 1.0000E-03
+Iteration 1: Deviation 6.2685E+00, Tolerance 1.0000E-03
+Iteration 2: Deviation 2.6055E+00, Tolerance 1.0000E-03
+Iteration 3: Deviation 7.9633E-01, Tolerance 1.0000E-03
+Iteration 4: Deviation 2.9315E-01, Tolerance 1.0000E-03
+Iteration 5: Deviation 1.1523E-01, Tolerance 1.0000E-03
+Iteration 6: Deviation 4.5822E-02, Tolerance 1.0000E-03
+Iteration 7: Deviation 1.8199E-02, Tolerance 1.0000E-03
+Iteration 8: Deviation 7.2447E-03, Tolerance 1.0000E-03
+Iteration 9: Deviation 2.8814E-03, Tolerance 1.0000E-03
+Iteration 10: Deviation 1.1464E-03, Tolerance 1.0000E-03
+Iteration 11: Deviation 4.5604E-04, Tolerance 1.0000E-03
+
+Final results:
+
+Pipe  Flow                     Flow                      Flow                    Head Loss       Head Loss
+  0   1.4119E-01 m ** 3 / s    4.9861E+00 ft ** 3 / s    2.2379E+03 gal / min    3.4381E+00 m    1.1280E+01 ft
+  1   4.6894E-02 m ** 3 / s    1.6560E+00 ft ** 3 / s    7.4328E+02 gal / min    3.2172E+00 m    1.0555E+01 ft
+  2   3.2307E-03 m ** 3 / s    1.1409E-01 ft ** 3 / s    5.1207E+01 gal / min    9.1866E-03 m    3.0140E-02 ft
+  3   7.8763E-02 m ** 3 / s    2.7815E+00 ft ** 3 / s    1.2484E+03 gal / min    2.5515E+00 m    8.3709E+00 ft
+  4   3.6288E-02 m ** 3 / s    1.2815E+00 ft ** 3 / s    5.7518E+02 gal / min    6.7497E-01 m    2.2145E+00 ft
+  5   5.8009E-02 m ** 3 / s    2.0486E+00 ft ** 3 / s    9.1946E+02 gal / min    4.0226E+00 m    1.3198E+01 ft
+  6   -2.9505E-02 m ** 3 / s    -1.0420E+00 ft ** 3 / s    -4.6766E+02 gal / min    1.3641E+00 m    4.4754E+00 ft
+  7   -2.7323E-02 m ** 3 / s    -9.6489E-01 ft ** 3 / s    -4.3307E+02 gal / min    5.5872E-01 m    1.8331E+00 ft
+  8   4.0001E-02 m ** 3 / s    1.4126E+00 ft ** 3 / s    6.3402E+02 gal / min    6.6530E-01 m    2.1827E+00 ft
+  9   2.5219E-02 m ** 3 / s    8.9059E-01 ft ** 3 / s    3.9972E+02 gal / min    1.2240E+00 m    4.0158E+00 ft
+ 10   1.7220E-02 m ** 3 / s    6.0812E-01 ft ** 3 / s    2.7294E+02 gal / min    6.5421E-01 m    2.1464E+00 ft
+ 11   3.0616E-03 m ** 3 / s    1.0812E-01 ft ** 3 / s    4.8527E+01 gal / min    1.1088E-02 m    3.6378E-02 ft
+ 12   1.1647E-02 m ** 3 / s    4.1132E-01 ft ** 3 / s    1.8461E+02 gal / min    8.2285E-02 m    2.6996E-01 ft
+ 13   4.4986E-02 m ** 3 / s    1.5887E+00 ft ** 3 / s    7.1305E+02 gal / min    1.3063E+00 m    4.2858E+00 ft
+ 14   6.7835E-02 m ** 3 / s    2.3956E+00 ft ** 3 / s    1.0752E+03 gal / min    7.9620E-01 m    2.6122E+00 ft
+ 15   3.9314E-04 m ** 3 / s    1.3884E-02 ft ** 3 / s    6.2315E+00 gal / min    3.1867E-05 m    1.0455E-04 ft
+

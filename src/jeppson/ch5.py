@@ -674,7 +674,7 @@ def solve_network_flows(case_dom):
 
         _logger.debug('8. Display interim results')
         print('Iteration {0:d}'.format(nct))
-        print('Deviation {0:0.4E} (Tolerance {1:0.4E}'
+        print('Deviation {0:0.4E} (Tolerance {1:0.4E})'
               .format(ssum, case_dom['params']['tolerance']))
 
         print()
