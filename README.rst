@@ -242,6 +242,15 @@ Identical numerical results are not expected due to differences in precision
 and calculational method. Note the discussion of design trade-offs and ease of
 testing in the *Design Information* section.
 
+The network flow solvers (``jeppson_ch5``, ``jeppson_ch6a``, ``jeppson_ch6b``,
+and ``jeppson_ch7``) are all tested via integral tests using the pytest
+framework, so it is possible to automate integral testing. It is not as simple
+as unit testing (relying on several fixtures) and the fidelity is rather coarse
+but it can be done.
+
+Additionally, flake8 compliance is incorporated in the test suite to enforce a
+reasonable level of stylistic quality.
+
 
 Development Note
 ================

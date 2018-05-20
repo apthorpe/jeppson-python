@@ -2,41 +2,37 @@
 jeppson-python
 ==============
 
-This is the documentation of **jeppson-python**.
+Pipe network flow analysis toolkit based on the work of Roland W. Jeppson.
 
-.. note::
+``python-jeppson`` is a library and set of applications replicating the
+software in *Steady Flow Analysis of Pipe Networks: An Instructional Manual*
+(1974). *Reports.* Paper 300.  http://digitalcommons.usu.edu/water_rep/300 and
+*Analysis of Flow in Pipe Networks* (1976). Ann Arbor Science Publishers, Inc.
+http://www.worldcat.org/title/analysis-of-flow-in-pipe-networks/oclc/927534147
+by Roland W. Jeppson.
 
-    This is the main page of your project's `Sphinx <http://sphinx-doc.org/>`_
-    documentation. It is formatted in `reStructuredText
-    <http://sphinx-doc.org/rest.html>`__. Add additional pages by creating
-    rst-files in ``docs`` and adding them to the `toctree
-    <http://sphinx-doc.org/markup/toctree.html>`_ below. Use then
-    `references <http://sphinx-doc.org/markup/inline.html>`__ in order to link
-    them from this page, e.g. :ref:`authors <authors>` and :ref:`changes`.
+Six command line applications are included, providing the functionality of the
+original Fortran applications described in the Jeppson texts:
 
-    It is also possible to refer to the documentation of other Python packages
-    with the `Python domain syntax
-    <http://sphinx-doc.org/domains.html#the-python-domain>`__. By default you
-    can reference the documentation of `Sphinx <http://sphinx.pocoo.org>`__,
-    `Python <http://docs.python.org/>`__, `NumPy
-    <http://docs.scipy.org/doc/numpy>`__, `SciPy
-    <http://docs.scipy.org/doc/scipy/reference/>`__, `matplotlib
-    <http://matplotlib.sourceforge.net>`__, `Pandas
-    <http://pandas.pydata.org/pandas-docs/stable>`__, `Scikit-Learn
-    <http://scikit-learn.org/stable>`__. You can add more by
-    extending the ``intersphinx_mapping`` in your Sphinx's ``conf.py``.
+* ``jeppson_ch2`` - Frictional head loss calculator
+* ``jeppson_ch4`` - Incompressible flow calculator
+* ``jeppson_ch5`` - Linear method pipe network flow solver
+* ``jeppson_ch6a`` - Newton-Raphson solver which determines junction pressures
+* ``jeppson_ch6b`` - Newton-Raphson solver which generates corrective loop flows
+* ``jeppson_ch7`` - Hardy Cross method pipe network flow solver
 
-    The pretty useful extension `autodoc
-    <http://www.sphinx-doc.org/en/stable/ext/autodoc.html>`__ is activated by
-    default and lets you include documentation from docstrings. Docstrings can
-    be written in `Google
-    <http://google.github.io/styleguide/pyguide.html#Comments>`__
-    (recommended!), `NumPy
-    <https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt>`__
-    and `classical
-    <http://www.sphinx-doc.org/en/stable/domains.html#info-field-lists>`__
-    style.
+Each program takes the same input file structure as its Fortran equivalent and
+generates the same results, though the output format may differ substantially
+from the original Fortran application.
 
+The original Fortran applications were recovered and modernized in a separate
+project, located at https://bitbucket.org/apthorpe/jeppson_pipeflow A brief
+description of the recovery process and a whitepaper summarizing the insights
+gained from the recovery and modernization work can be found at
+https://www.linkedin.com/pulse/case-study-revitalizing-legacy-engineering-jeppson-pipe-bob-apthorpe/
+
+Consider this project to be thematically related, demonstrating the
+implementation of these programs in Python.
 
 Contents
 ========
