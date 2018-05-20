@@ -52,7 +52,7 @@ class InputLine(dict):
         if ltline == 0:
             self._type = 'blank'
         else:
-            if commentchar and self._line.startswith(commentchar):
+            if commentchar and tline.startswith(commentchar):
                 self._type = 'comment'
             else:
                 self._type = 'data'
