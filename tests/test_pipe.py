@@ -74,6 +74,32 @@ def test_simple_chw_pipe():
     with raises(ValueError):
         p1.chw = 3600.0
 
+def test_simple_ef_pipe():
+    p1 = SimpleEFPipe(label='Pipe 1', length=100.0 * ureg.foot,
+                    idiameter=12.0 * ureg.inch, eroughness=8.5E-4)
+    assert p1.label == 'Pipe 1'
+    assert p1.length.to('m').magnitude == approx(30.48)
+    assert p1.idiameter.to('m').magnitude == approx(0.3048)
+    assert p1.ld_ratio.to_base_units().magnitude == approx(100.0)
+    assert p1.flow_area.to('m**2').magnitude == approx(0.07296587699003966)
+    assert p1.eroughness == approx(8.5E-4)
+    assert p1.froughness.to('in').magnitude == approx(1.02E-2)
+
+    p1.froughness = 2.04E-2 * ureg.inch
+    assert p1.eroughness == approx(1.7E-3)
+
+    with raises(ValueError):
+        p1.eroughness = -0.0004
+
+    with raises(ValueError):
+        p1.eroughness = 0.1001
+
+    with raises(ValueError):
+        p1.froughness = -0.0004 * ureg.inch
+
+    with raises(ValueError):
+        p1.froughness = 0.1001 * p1.idiameter
+
 def test_pipe():
     p1 = Pipe(label='Pipe 1', length=100.0 * sc.foot, 
               idiameter=12.0 * sc.inch, odiameter=12.5 * sc.inch,

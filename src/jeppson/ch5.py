@@ -26,6 +26,7 @@ import numpy as np
 import pygraphviz as pgv
 
 from . import _logger, Q_
+from jeppson.constants import edhw
 from jeppson.input import InputLine
 from jeppson import __version__
 
@@ -780,7 +781,7 @@ def set_pipe_derived_properties(pipelist):
 #                             .format(unitcode))
 
         currpipe['expp'] = 0.0
-        currpipe['kp'] = kpcoeff * currpipe['LD'] ** 4.87
+        currpipe['kp'] = kpcoeff * currpipe['LD']**edhw
 
         _logger.debug('Pipe {:d}: '
                       'Aflow = {:0.4E~}, '

@@ -30,13 +30,15 @@ class SimplePipe(object):
 
     Attributes:
         label (str): text description
-        length (float): length in meters
-        idiameter (float): pipe inner diameter in meters
+        length (Quantity): length in length units
+        idiameter (Quantity): pipe inner diameter in length units
+        flow_area (Quantity): pipe flow_area in area units
+        ld_ratio (float): length to diameter ratio, dimensionless
 
     Args:
         label (str): text description, Required.
-        length (float): length in meters. Required.
-        idiameter (float): pipe inner diameter in meters. Required
+        length (Quantity): length in length units. Required.
+        idiameter (Quantity): pipe inner diameter in length units. Required
     """
     @ureg.check((None, None, '[length]', '[length]'))
     def __init__(self, label, length, idiameter):
@@ -46,8 +48,9 @@ class SimplePipe(object):
 
         Args:
             label (str): text description, Required.
-            length (float): length in meters. Required.
-            idiameter (float): pipe inner diameter in meters. Required.
+            length (Quantity): length in length units. Required.
+            idiameter (Quantity): pipe inner diameter in length units.
+              Required.
 
         Raises:
             ValueError: An error occurred setting an attribute.
@@ -56,6 +59,7 @@ class SimplePipe(object):
         self.label = label
         self._length = length
         self._idiameter = idiameter
+        self._flow_set = False
 
         # Set radial dimensions
         self._update_flow_area()
@@ -75,13 +79,13 @@ class SimplePipe(object):
         """Inner diameter read accessor
 
             Returns:
-                float: inner diameter, meters"""
+                Quantity: inner diameter, length units"""
         return self._idiameter
 
     @idiameter.setter
     @ureg.check((None, '[length]'))
     def idiameter(self, idiameter):
-        """Inner diameter accessor - write
+        """Inner diameter write accessor
 
         Raises:
             ValueError: Unreasonable value for inner diameter."""
@@ -100,7 +104,7 @@ class SimplePipe(object):
         """Pipe length read accessor
 
             Returns:
-                float: pipe length, meters"""
+                Quantity: pipe length, in length units"""
         return self._length
 
     @length.setter
@@ -123,7 +127,7 @@ class SimplePipe(object):
         """Pipe flow area read accessor
 
             Returns:
-                float: pipe interior cross-sectional flow area, square
+                Quantity: pipe interior cross-sectional flow area, square
                     meters"""
         return self._flow_area
 
@@ -160,14 +164,14 @@ class SimpleCHWPipe(SimplePipe):
 
     Attributes:
         label (str): text description
-        length (float): length in meters
-        idiameter (float): pipe inner diameter in meters
+        length (Quantity): length in length units
+        idiameter (Quantity): pipe inner diameter in length units
         chw (float): Hazen-Williams coefficient
 
     Args:
         label (str): text description, Required.
-        length (float): length in meters. Required.
-        idiameter (float): pipe inner diameter in meters. Required
+        length (Quantity): length in length units. Required.
+        idiameter (Quantity): pipe inner diameter in length units. Required
         chw (float): Hazen-Williams coefficient
     """
     @ureg.check((None, None, '[length]', '[length]', None))
@@ -178,8 +182,8 @@ class SimpleCHWPipe(SimplePipe):
 
         Args:
             label (str): text description, Required.
-            length (float): length in meters. Required.
-            idiameter (float): pipe inner diameter in meters. Required.
+            length (Quantity): length in length units. Required.
+            idiameter (Quantity): pipe inner diameter in length units. Required.
             chw (float): Hazen-Williams coefficient, dimensionless. Required.
 
         Raises:
@@ -195,7 +199,7 @@ class SimpleCHWPipe(SimplePipe):
         """Hazen_williams coefficient read accessor
 
             Returns:
-                float: inner diameter, meters"""
+                float: Hazen_williams coefficient, dimensionless"""
         return self._chw
 
     @chw.setter
@@ -219,13 +223,13 @@ class SimpleEFPipe(SimplePipe):
 
     Attributes:
         label (str): text description
-        length (float): length in meters
-        idiameter (float): pipe inner diameter in meters
+        length (Quantity): length in length units
+        idiameter (Quantity): pipe inner diameter in length units
 
     Args:
         label (str): text description, Required.
-        length (float): length in meters. Required.
-        idiameter (float): pipe inner diameter in meters. Required
+        length (Quantity): length in length units. Required.
+        idiameter (Quantity): pipe inner diameter in length units. Required
     """
     @ureg.check((None, None, '[length]', '[length]', '[length]', None))
     def __init__(self, label, length, idiameter, *,
@@ -237,9 +241,9 @@ class SimpleEFPipe(SimplePipe):
 
         Args:
             label (str): text description, Required.
-            length (float): length in length units. Required.
-            idiameter (float): pipe inner diameter in length units. Required.
-            froughness (float): absolute pipe roughness in length units.
+            length (Quantity): length in length units. Required.
+            idiameter (Quantity): pipe inner diameter in length units. Required.
+            froughness (Quantity): absolute pipe roughness in length units.
                                 Required if eroughness not set.
             eroughness (float): relative pipe roughness, dimensionless.
                                 Required if froughness not set.
@@ -260,6 +264,10 @@ class SimpleEFPipe(SimplePipe):
 
     @property
     def idiameter(self):
+        """Inner diameter read accessor
+
+            Returns:
+                Quantity: inner diameter, length units"""
         return self._idiameter
 
     @idiameter.setter
@@ -281,6 +289,10 @@ class SimpleEFPipe(SimplePipe):
     @froughness.setter
     @ureg.check((None, '[length]'))
     def froughness(self, froughness):
+        """Absolute pipe roughness write accessor
+
+        Raises:
+            ValueError: Unreasonable value for absolute pipe roughness."""
 
         if froughness.to('m').magnitude < 0.0:
             raise ValueError('Absolute surface roughness is too small '
@@ -471,7 +483,7 @@ class Pipe(object):
 
     @idiameter.setter
     def idiameter(self, idiameter):
-        """Inner diameter accessor - write
+        """Inner diameter write accessor
 
         Raises:
             ValueError: Unreasonable value for inner diameter."""
@@ -507,7 +519,7 @@ class Pipe(object):
 
     @odiameter.setter
     def odiameter(self, odiameter):
-        """Outer diameter accessor - write
+        """Outer diameter write accessor
 
         Raises:
             ValueError: Unreasonable value for inner diameter."""
@@ -543,7 +555,7 @@ class Pipe(object):
 
     @twall.setter
     def twall(self, twall):
-        """Wall thickness accessor - write
+        """Wall thickness write accessor
 
         Raises:
             ValueError: Unreasonable value for wall thickness."""
@@ -576,7 +588,7 @@ class Pipe(object):
 
     @length.setter
     def length(self, length):
-        """Inner diameter accessor - write
+        """Inner diameter write accessor
 
         Raises:
             ValueError: Unreasonable value for pipe length."""
@@ -597,7 +609,7 @@ class Pipe(object):
 
     @eroughness.setter
     def eroughness(self, eroughness):
-        """Pipe wall roughness accessor - write
+        """Pipe wall roughness write accessor
 
         Raises:
             ValueError: Unreasonable value for relative roughness."""
@@ -619,7 +631,7 @@ class Pipe(object):
 
     @flow_area.setter
     def flow_area(self, flow_area):
-        """Pipe flow area - write
+        """Pipe flow area write accessor
 
         Raises:
             ValueError: Cannot set derived quantity. """
@@ -637,7 +649,7 @@ class Pipe(object):
 
     @clean.setter
     def clean(self, clean):
-        """Pipe cleanliness - write
+        """Pipe cleanliness write accessor
 
         Raises:
             ValueError: Cannot set derived quantity. """
@@ -654,7 +666,7 @@ class Pipe(object):
 
     @surface.setter
     def surface(self, surface):
-        """Pipe surface - write
+        """Pipe surface write accessor
 
         Raises:
             ValueError: Cannot set derived quantity. """
