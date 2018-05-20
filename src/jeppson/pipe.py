@@ -11,7 +11,7 @@ import fluids.vectorized as fv
 import scipy.constants as sc
 from tabulate import tabulate
 
-from . import _logger
+from . import _logger, Q_, ureg
 # import logging
 # # Set default logging handler to avoid "No handler found" warnings.
 # try:  # Python 2.7+
@@ -25,8 +25,295 @@ from . import _logger
 # LOG.addHandler(NullHandler())
 
 
+class SimplePipe(object):
+    """Simple segment class
+
+    Attributes:
+        label (str): text description
+        length (float): length in meters
+        idiameter (float): pipe inner diameter in meters
+
+    Args:
+        label (str): text description, Required.
+        length (float): length in meters. Required.
+        idiameter (float): pipe inner diameter in meters. Required
+    """
+    @ureg.check((None, None, '[length]', '[length]'))
+    def __init__(self, label, length, idiameter):
+        """Simple pipe segment constructor
+
+        All arguments are mandatory.
+
+        Args:
+            label (str): text description, Required.
+            length (float): length in meters. Required.
+            idiameter (float): pipe inner diameter in meters. Required.
+
+        Raises:
+            ValueError: An error occurred setting an attribute.
+        """
+
+        self.label = label
+        self._length = length
+        self._idiameter = idiameter
+
+        # Set radial dimensions
+        self._update_flow_area()
+        self._update_ld_ratio()
+
+    def _update_flow_area(self):
+        """Internal method to update flow area on a change to inner diameter"""
+        self._flow_area = sc.pi * self._idiameter**2 / 4.0
+
+    def _update_ld_ratio(self):
+        """Internal method to update pipe aspect ratio (L/D)"""
+        if self._idiameter > (0.0 * ureg.meter):
+            self._ld_ratio = self._length / self._idiameter 
+
+    @property
+    def idiameter(self):
+        """Inner diameter read accessor
+
+            Returns:
+                float: inner diameter, meters"""
+        return self._idiameter
+
+    @idiameter.setter
+    @ureg.check((None, '[length]'))
+    def idiameter(self, idiameter):
+        """Inner diameter accessor - write
+
+        Raises:
+            ValueError: Unreasonable value for inner diameter."""
+
+        if idiameter < (1.0E-3 * ureg.meter):
+            raise ValueError('Inner diameter too small (<1mm)')
+        elif idiameter > (10.0 * ureg.meter):
+            raise ValueError('Inner diameter too large (>10m)')
+
+        self._idiameter = idiameter
+        self._update_flow_area()
+        self._update_ld_ratio()
+
+    @property
+    def length(self):
+        """Pipe length read accessor
+
+            Returns:
+                float: pipe length, meters"""
+        return self._length
+
+    @length.setter
+    @ureg.check((None, '[length]'))
+    def length(self, length):
+        """Inner diameter accessor write accessor
+
+        Raises:
+            ValueError: Unreasonable value for pipe length."""
+        if length < (1.0E-3 * ureg.meter):
+            raise ValueError('Length too small (<1mm)')
+        elif length > (1000.0 * ureg.meter):
+            raise ValueError('Length too large (>1000m)')
+
+        self._length = length
+        self._update_ld_ratio()
+
+    @property
+    def flow_area(self):
+        """Pipe flow area read accessor
+
+            Returns:
+                float: pipe interior cross-sectional flow area, square
+                    meters"""
+        return self._flow_area
+
+    @flow_area.setter
+    def flow_area(self, flow_area):
+        """Pipe flow area write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set flow area; '
+                         'value is derived from inner diameter')
+
+    @property
+    def ld_ratio(self):
+        """Pipe L/D ratio read accessor
+
+            Returns:
+                float: pipe interior cross-sectional flow area, square
+                    meters"""
+        return self._ld_ratio
+
+    @ld_ratio.setter
+    def ld_ratio(self, ld_ratio):
+        """Pipe L/D ratio write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set length-to-diameter ratio; '
+                         'value is derived from inner diameter and length')
+
+
+class SimpleCHWPipe(SimplePipe):
+    """Simple pipe segment class using Hazen-Williams loss coefficients
+
+    Attributes:
+        label (str): text description
+        length (float): length in meters
+        idiameter (float): pipe inner diameter in meters
+        chw (float): Hazen-Williams coefficient
+
+    Args:
+        label (str): text description, Required.
+        length (float): length in meters. Required.
+        idiameter (float): pipe inner diameter in meters. Required
+        chw (float): Hazen-Williams coefficient
+    """
+    @ureg.check((None, None, '[length]', '[length]', None))
+    def __init__(self, label, length, idiameter, chw):
+        """Simple CHW pipe segment constructor
+
+        All arguments are mandatory.
+
+        Args:
+            label (str): text description, Required.
+            length (float): length in meters. Required.
+            idiameter (float): pipe inner diameter in meters. Required.
+            chw (float): Hazen-Williams coefficient, dimensionless. Required.
+
+        Raises:
+            ValueError: An error occurred setting an attribute.
+        """
+
+        super().__init__(label, length, idiameter)
+
+        self.chw = chw
+
+    @property
+    def chw(self):
+        """Hazen_williams coefficient read accessor
+
+            Returns:
+                float: inner diameter, meters"""
+        return self._chw
+
+    @chw.setter
+    @ureg.check((None, None))
+    def chw(self, chw):
+        """Hazen_williams coefficient write accessor
+
+        Raises:
+            ValueError: Unreasonable value for inner diameter."""
+
+        if chw < 0.0:
+            raise ValueError('Hazen-Williams coefficient is too small (< 0.0)')
+        elif chw > 1000.0:
+            raise ValueError('Hazen-Williams coefficient is too large '
+                             '(< 1000.0)')
+
+        self._chw = chw
+
+class SimpleEFPipe(SimplePipe):
+    """Simple pipe segment class with surface roughness
+
+    Attributes:
+        label (str): text description
+        length (float): length in meters
+        idiameter (float): pipe inner diameter in meters
+
+    Args:
+        label (str): text description, Required.
+        length (float): length in meters. Required.
+        idiameter (float): pipe inner diameter in meters. Required
+    """
+    @ureg.check((None, None, '[length]', '[length]', '[length]', None))
+    def __init__(self, label, length, idiameter, *,
+                 froughness=None, eroughness=None):
+        """Simple pipe segment constructor
+
+        Label, length, and inner diameter are required; one of froughness or
+        eroughness is required.
+
+        Args:
+            label (str): text description, Required.
+            length (float): length in length units. Required.
+            idiameter (float): pipe inner diameter in length units. Required.
+            froughness (float): absolute pipe roughness in length units.
+                                Required if eroughness not set.
+            eroughness (float): relative pipe roughness, dimensionless.
+                                Required if froughness not set.
+
+        Raises:
+            ValueError: An error occurred setting an attribute.
+        """
+
+        super().__init__(label, length, idiameter)
+
+        if froughness:
+            self.froughness = froughness
+        elif eroughness:
+            self.eroughness = eroughness
+        else:
+            self._froughness = Q_(0.0, 'm')
+            self._eroughness = 0.0
+
+    @property
+    def idiameter(self):
+        return self._idiameter
+
+    @idiameter.setter
+    @ureg.check((None, '[length]'))
+    def idiameter(self, idiameter):
+        """Inner diameter write accessor
+
+        Raises:
+            ValueError: Unreasonable value for inner diameter."""
+
+        super().idiameter(self, idiameter)
+
+        self._eroughness = self._froughness / self._idiameter
+
+    @property
+    def froughness(self):
+        return self._froughness
+
+    @froughness.setter
+    @ureg.check((None, '[length]'))
+    def froughness(self, froughness):
+
+        if froughness.to('m').magnitude < 0.0:
+            raise ValueError('Absolute surface roughness is too small '
+                             '(< 0.0m)')
+        elif froughness.to('m').magnitude \
+            > 0.1 * self._idiameter.to('m').magnitude:
+            raise ValueError('Absolute surface roughness is too large '
+                             '(> 0.1 idiameter)')
+
+        self._froughness = froughness
+        self._eroughness = self._froughness / self._idiameter
+
+    @property
+    def eroughness(self):
+        return self._eroughness
+
+    @eroughness.setter
+    @ureg.check((None, '[length]'))
+    def eroughness(self, eroughness):
+
+        if eroughness < 0.0:
+            raise ValueError('Relative surface roughness is too small '
+                             '(< 0.0)')
+        elif eroughness > 0.1:
+            raise ValueError('Relative surface roughness is too large '
+                             '(> 0.1)')
+
+        self._eroughness = eroughness
+        self._froughness = self._eroughness * self._idiameter
+
+
 class Pipe(object):
-    """Simple pipe segment class
+    """Pipe segment class
 
     All parameters are optional except label and length.
     A sensible combination of NPS and schedule or diameter, wall
@@ -78,7 +365,7 @@ class Pipe(object):
     def __init__(self, label, length, idiameter=0.0, odiameter=0.0, twall=0.0,
                  nps=0.0, schedule='', eroughness=0.0, froughness=0.0,
                  surface='smooth', is_clean=True):
-        """Simple pipe segment constructor
+        """Pipe segment constructor
 
         All parameters are optional except label and length.
         A sensible combination of NPS and schedule or diameter, wall

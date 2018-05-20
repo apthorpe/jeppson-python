@@ -2,13 +2,77 @@
 # -*- coding: utf-8 -*-
 
 from pytest import approx, raises
-from jeppson.pipe import Pipe
+from jeppson.pipe import Pipe, SimplePipe, SimpleCHWPipe, SimpleEFPipe, \
+                         ureg, Q_
 import scipy.constants as sc
 
 __author__ = "Bob Apthorpe"
 __copyright__ = "Bob Apthorpe"
 __license__ = "mit"
 
+
+def test_simple_pipe():
+    p1 = SimplePipe(label='Pipe 1', length=100.0 * ureg.foot,
+                    idiameter=12.0 * ureg.inch)
+    assert p1.label == 'Pipe 1'
+    assert p1.length.to('m').magnitude == approx(30.48)
+    assert p1.idiameter.to('m').magnitude == approx(0.3048)
+    assert p1.ld_ratio.to_base_units().magnitude == approx(100.0)
+    assert p1.flow_area.to('m**2').magnitude == approx(0.07296587699003966)
+
+    with raises(ValueError):
+        p1.ld_ratio = Q_(50.0, '')
+
+    with raises(ValueError):
+        p1.flow_area = Q_(2.9186E-1, 'm**2')
+
+    with raises(ValueError):
+        p1.length = Q_(1200.0, 'm')
+
+    with raises(ValueError):
+        p1.length = Q_(9.0E-4, 'm')
+
+    with raises(ValueError):
+        p1.idiameter = Q_(35.0, 'ft')
+
+    with raises(ValueError):
+        p1.idiameter = Q_(9.0E-4, 'm')
+
+    p2 = SimplePipe(label='Pipe 2', length=100.0 * ureg.foot,
+                    idiameter=12.0 * ureg.inch)
+
+    p2.length = Q_(50.0, 'ft')
+    assert p2.length.to('m').magnitude == approx(15.24)
+    assert p2.idiameter.to('m').magnitude == approx(0.3048)
+    assert p2.ld_ratio.to_base_units().magnitude == approx(50.0)
+    assert p2.flow_area.to('m**2').magnitude == approx(0.07296587699003966)
+
+    p2.idiameter = Q_(24.0, 'in')
+    assert p2.length.to('m').magnitude == approx(15.24)
+    assert p2.idiameter.to('m').magnitude == approx(0.6096)
+    assert p2.ld_ratio.to_base_units().magnitude == approx(25.0)
+    assert p2.flow_area.to('m**2').magnitude == approx(0.291863261)
+
+    return
+
+def test_simple_chw_pipe():
+    p1 = SimpleCHWPipe(label='Pipe 1', length=100.0 * ureg.foot,
+                    idiameter=12.0 * ureg.inch, chw=150.0)
+    assert p1.label == 'Pipe 1'
+    assert p1.length.to('m').magnitude == approx(30.48)
+    assert p1.idiameter.to('m').magnitude == approx(0.3048)
+    assert p1.ld_ratio.to_base_units().magnitude == approx(100.0)
+    assert p1.flow_area.to('m**2').magnitude == approx(0.07296587699003966)
+    assert p1.chw == approx(150.0)
+
+    p1.chw = 130.0
+    assert p1.chw == approx(130.0)
+
+    with raises(ValueError):
+        p1.chw = -4.0
+
+    with raises(ValueError):
+        p1.chw = 3600.0
 
 def test_pipe():
     p1 = Pipe(label='Pipe 1', length=100.0 * sc.foot, 
