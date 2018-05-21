@@ -8,6 +8,7 @@ from __future__ import absolute_import, division, print_function
 # import pint
 
 import fluids.vectorized as fv
+from fluids.friction import friction_factor
 import scipy.constants as sc
 from tabulate import tabulate
 
@@ -262,6 +263,36 @@ class SimpleEFPipe(SimplePipe):
             self._froughness = Q_(0.0, 'm')
             self._eroughness = 0.0
 
+        self._Re = 0.0
+        self._vflow = Q_(0.0, 'm/s')
+        self._vol_flow = Q_(0.0, 'm**3/s')
+        self._kin_visc = Q_(0.0, 'm**2/s')
+        self._friction = 0.0
+
+    def set_flow_conditions(self, vol_flow, kin_visc):
+        """Specify volumetric flow and fluid properties so flow velocity,
+        Reynolds number, and friction factor may be calculated.
+        
+        Args:
+            vol_flow (Quantity): Volumetric flow rate
+            kin_visc (Quantity): Kinematic viscosity
+
+        Raises:
+            ValueError: An error occurred deriving friction factor, etc."""
+        self._vol_flow = vol_flow
+        self._kin_visc = kin_visc
+
+        self._vflow = self._vol_flow / self.flow_area
+
+        self._Re = (self._vflow.to('m/s') * self._idiameter.to('m')
+                    / self._kin_visc.to('m**2/s')).magnitude
+
+        self._friction = friction_factor(Re=self._Re, eD=self._eroughness)
+
+        self._flow_set = True
+
+        return
+
     @property
     def idiameter(self):
         """Inner diameter read accessor
@@ -303,7 +334,8 @@ class SimpleEFPipe(SimplePipe):
                              '(> 0.1 idiameter)')
 
         self._froughness = froughness
-        self._eroughness = self._froughness / self._idiameter
+        self._eroughness = (self._froughness.to('m') 
+                            / self._idiameter.to('m')).magnitude
 
     @property
     def eroughness(self):
@@ -322,6 +354,106 @@ class SimpleEFPipe(SimplePipe):
 
         self._eroughness = eroughness
         self._froughness = self._eroughness * self._idiameter
+
+    @property
+    def vol_flow(self):
+        """Volumetric flow read accessor
+
+            Returns:
+                Quantity: volumetric flow rate """
+        if self._flow_set:
+            return self._vol_flow
+        else:
+            raise ValueError('Flow conditions are not set for pipe')
+
+    @vol_flow.setter
+    def vol_flow(self, vol_flow):
+        """Volumetric flow write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set volumetric flow rate as an '
+                         'attribute')
+
+    @property
+    def kin_visc(self):
+        """Kinematic viscosity read accessor
+
+            Returns:
+                Quantity: Kinematic viscosity """
+        if self._flow_set:
+            return self._kin_visc
+        else:
+            raise ValueError('Flow conditions are not set for pipe')
+
+    @kin_visc.setter
+    def kin_visc(self, kin_visc):
+        """Kinematic viscosity write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set kinematic viscosity as an '
+                         'attribute')
+
+    @property
+    def vflow(self):
+        """Flow velocity read accessor
+
+            Returns:
+                Quantity: flow velocity """
+        if self._flow_set:
+            return self._vflow
+        else:
+            raise ValueError('Flow conditions are not set for pipe')
+
+    @vflow.setter
+    def vflow(self, vflow):
+        """Flow velocity write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set flow velocity as an '
+                         'attribute')
+
+    @property
+    def Re(self):
+        """Reynolds number read accessor
+
+            Returns:
+                float: Reynolds number """
+        if self._flow_set:
+            return self._Re
+        else:
+            raise ValueError('Flow conditions are not set for pipe')
+
+    @Re.setter
+    def Re(self, Re):
+        """Reynolds number write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set Reynolds number as an '
+                         'attribute')
+
+    @property
+    def friction(self):
+        """Darcy-Weisbach friction factor read accessor
+
+            Returns:
+                float: Darcy-Weisbach friction factor """
+        if self._flow_set:
+            return self._friction
+        else:
+            raise ValueError('Flow conditions are not set for pipe')
+
+    @friction.setter
+    def friction(self, friction):
+        """Darcy-Weisbach friction factor write accessor
+
+        Raises:
+            ValueError: Cannot set derived quantity. """
+        raise ValueError('Cannot directly set Darcy-Weisbach friction factor '
+                         'as an attribute')
 
 
 class Pipe(object):

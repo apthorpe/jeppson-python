@@ -100,6 +100,48 @@ def test_simple_ef_pipe():
     with raises(ValueError):
         p1.froughness = 0.1001 * p1.idiameter
 
+    with raises(ValueError):
+        p1.vol_flow = Q_(0.5, 'ft**3/s')
+
+    with raises(ValueError):
+        print(p1.vol_flow)
+
+    with raises(ValueError):
+        p1.kin_visc = Q_(1.217E-5, 'ft**2/s')
+
+    with raises(ValueError):
+        print(p1.kin_visc)
+
+    with raises(ValueError):
+        p1.vflow = Q_(5.0, 'ft/s')
+
+    with raises(ValueError):
+        print(p1.vflow)
+
+    with raises(ValueError):
+        p1.Re = 500000.0
+
+    with raises(ValueError):
+        print(p1.Re)
+
+    with raises(ValueError):
+        p1.friction = 0.0014
+
+    with raises(ValueError):
+        print(p1.friction)
+
+    p1 = SimpleEFPipe(label='Pipe 1', length=150.0 * ureg.foot,
+                    idiameter=4.0 * ureg.inch, froughness=7.0E-6 * ureg.foot)
+
+    p1.set_flow_conditions(vol_flow=Q_(0.5, 'ft**3/s'),
+                           kin_visc=Q_(1.217E-5, 'ft**2/s'))
+
+    assert p1.vol_flow.to('ft**3/s').magnitude == approx(0.5)
+    assert p1.kin_visc.to('ft**2/s').magnitude == approx(1.217E-5)
+    assert p1.vflow.to('ft/s').magnitude == approx(5.72957795)
+    assert p1.Re == approx(156931.7)
+    assert p1.friction == approx(0.016554318)
+
 def test_pipe():
     p1 = Pipe(label='Pipe 1', length=100.0 * sc.foot, 
               idiameter=12.0 * sc.inch, odiameter=12.5 * sc.inch,
