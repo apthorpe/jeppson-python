@@ -60,6 +60,12 @@ def parse_args(args):
         default=[sys.stdin],
         metavar="FILE")
     parser.add_argument(
+        '-t',
+        '--topology',
+        dest="topology",
+        help="create GraphViz topology diagrams",
+        action='store_true')
+    parser.add_argument(
         '-v',
         '--verbose',
         dest="loglevel",
@@ -730,8 +736,10 @@ def main(args):
             print()
             print(junction_results_table(case_dom))
 
-            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
-            create_topology_dotfile(case_dom, dotfn)
+            if args.topology:
+                dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'
+                                                         .format(icase))
+                create_topology_dotfile(case_dom, dotfn)
 
 #            print('case_dom:')
 #            _pp.pprint(case_dom)

@@ -60,6 +60,12 @@ def parse_args(args):
         default=[sys.stdin],
         metavar="FILE")
     parser.add_argument(
+        '-t',
+        '--topology',
+        dest="topology",
+        help="create GraphViz topology diagrams",
+        action='store_true')
+    parser.add_argument(
         '-v',
         '--verbose',
         dest="loglevel",
@@ -933,22 +939,32 @@ def main(args):
             print(pipe_dimension_table(case_dom['pipe']))
             print()
 
+            failed = False
             try:
                 solve_network_flows(case_dom)
             except ValueError as err:
-                _logger.error('Failed to solve case {0:d} from {1:s}: {2:s}'
-                              .format(icase, fh.name, str(err)))
-                _logger.info('Advancing to next case.')
-                continue
+                failed = True
+                if str(err).startswith('Cannot solve'):
+                    _logger.error('Failed to solve case {0:d} '
+                                  'from {1:s}: {2:s}'
+                                  .format(icase, fh.name, str(err)))
+                    _logger.info('Advancing to next case.')
+                    continue
 
             # Step 10. Display results
             _logger.debug('10. Display final results')
 
             print('\nFinal results:\n')
+            if failed:
+                print('WARNING: Case {0:d} did not converge.\n'
+                      .format(icase))
+
             print(flow_and_head_loss_report(case_dom))
 
-            dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'.format(icase))
-            create_topology_dotfile(case_dom, dotfn)
+            if args.topology:
+                dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'
+                                                         .format(icase))
+                create_topology_dotfile(case_dom, dotfn)
 
 #            print('case_dom:')
 #            _pp.pprint(case_dom)
