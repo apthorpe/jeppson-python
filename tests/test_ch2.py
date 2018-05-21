@@ -58,7 +58,7 @@ def test_ch2(datadir, run):
         rfn = datadir.join("{:s}.ref.out".format(basefn))
 
 # Run ch2.py and check for successful termination
-        result = run(ifn)
+        result = run('--legacy', '--no-modern', ifn)
         assert result.ret == 0
 
 # Compare code output with reference output

@@ -138,6 +138,34 @@ def parse_args(args):
         default=[sys.stdin],
         metavar="FILE")
     parser.add_argument(
+        '-L',
+        '--legacy',
+        dest="legacy",
+        help="show legacy format results",
+        action='store_true',
+        default=False)
+    parser.add_argument(
+        '-Lx',
+        '--no-legacy',
+        dest="legacy",
+        help="omit legacy format results (true if not specified)",
+        action='store_false',
+        default=False)
+    parser.add_argument(
+        '-M',
+        '--modern',
+        dest="modern",
+        help="show modern format results (true if not specified)",
+        action='store_true',
+        default=True)
+    parser.add_argument(
+        '-Mx',
+        '--no-modern',
+        dest="modern",
+        help="omit modern format results",
+        action='store_false',
+        default=True)
+    parser.add_argument(
         '-v',
         '--verbose',
         dest="loglevel",
@@ -453,6 +481,62 @@ def generate_legacy_output(idata, odata, units):
     return outstr
 
 
+def generate_modern_output(idata, ddata, odata, units):
+    """Return head loss, friction factor, and initial conditions
+
+    Args:
+        idata (dict): Input to head loss calculations
+        ddata (dict): Intermediate results of head loss calculations
+        odata (dict): Results of head loss calculations
+        units (str): Display units for reporting results - either 'SI'
+          or 'Traditional'
+
+    Returns:
+        (str): Tabular results with descriptions and units
+    """
+    unitmap = {
+        'idiameter':  {'SI': 'm',      'Traditional': 'ft'},
+        'lpipe':      {'SI': 'm',      'Traditional': 'ft'},
+        'flow_area':  {'SI': 'm**2',   'Traditional': 'ft**2'},
+        'froughness': {'SI': 'm',      'Traditional': 'ft'},
+        'eroughness': {'SI': '',       'Traditional': ''},
+        'vol_flow':   {'SI': 'm**3/s', 'Traditional': 'ft**3/s'},
+        'vflow':      {'SI': 'm/s',    'Traditional': 'ft/s'},
+        'Re':         {'SI': '',       'Traditional': ''},
+        'friction':   {'SI': '',       'Traditional': ''},
+        'head_loss':  {'SI': 'm',      'Traditional': 'ft'}
+    }
+
+    if units in ('SI', 'Traditional'):
+        dunits = units
+    else:
+        dunits = 'SI'
+
+    ofmt_d = '{0:30s}    {1:0.4E~}'
+    ofmt_nd = '{0:30s}    {1:0.4E}'
+
+    _logger.debug('Display units are {0:s}'.format(units))
+    outary = []
+    for tag in unitmap:
+        if tag in idata:
+            fval = idata[tag]
+        elif tag in ddata:
+            fval = ddata[tag]
+        elif tag in odata:
+            fval = odata[tag]
+
+        uval = unitmap[tag][dunits]
+        desc = idataprop[tag].description
+        if uval == '':
+            outary.append(ofmt_nd.format(desc, fval))
+        else:
+            outary.append(ofmt_d.format(desc, fval.to(uval)))
+
+    outstr = '\n\n' + '\n'.join(outary)
+
+    return outstr
+
+
 def main(args):
     """Main entry point allowing external calls
 
@@ -497,10 +581,18 @@ def main(args):
                 # Finally, print results as original code; infer output units
                 # from input units
                 if results['status'] in ('ok', 'warning'):
-                    ostr = generate_legacy_output(idata,
-                                                  results['output'],
-                                                  indat['units'])
-                    print(ostr)
+                    if args.legacy:
+                        ostr = generate_legacy_output(idata,
+                                                      results['output'],
+                                                      indat['units'])
+                        print(ostr)
+
+                    if args.modern:
+                        ostr = generate_modern_output(idata,
+                                                      results['derived'],
+                                                      results['output'],
+                                                      indat['units'])
+                        print(ostr)
                 else:
                     # Differs from original code; broken input would crash and
                     # all input was provided via STDIN. Here multiple files may
