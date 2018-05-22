@@ -16,11 +16,14 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import logging
 # import pprint
+from collections import OrderedDict
 from math import copysign
+from os.path import abspath, splitext
 import sys
 
 import scipy.constants as sc
 import numpy as np
+import pygraphviz as pgv
 
 from . import _logger, Q_
 from jeppson.input import InputLine
@@ -57,6 +60,12 @@ def parse_args(args):
         nargs='*',
         default=[sys.stdin],
         metavar="FILE")
+    parser.add_argument(
+        '-t',
+        '--topology',
+        dest="topology",
+        help="create GraphViz topology diagrams",
+        action='store_true')
     parser.add_argument(
         '-v',
         '--verbose',
@@ -673,6 +682,225 @@ def flow_and_head_loss_report(case_dom):
     return outstr
 
 
+def alias_pipe_endpoints(loop):
+    """ Assign head/tail loop pipe endpoint aliases to loop pipe
+    to simplify network derivation from loops
+
+    This abstraction allows consistent head/tail nomenclature to
+    be used within a loop pipe while tracking directional to/from
+    'sense' of a given pipe with respect to loop pipe flow direction.
+
+    Args:
+        loop ([dict]): Loop list"""
+
+    for currloop in loop:
+        for currpipe in currloop:
+            if currpipe['flow_dir'] < 0.0:
+                currpipe['head'] = 'to'
+                currpipe['tail'] = 'from'
+            else:
+                currpipe['head'] = 'from'
+                currpipe['tail'] = 'to'
+
+
+def derive_junctions_from_loops(case_dom):
+    """Derive full pipe network topology and explicitly enumerate junctions
+    based on lists of pipes and flow loops
+
+    Args:
+        case_dom (dict): Pipe flow network data model
+    """
+
+    pipe = case_dom['pipe']
+    loop = case_dom['loop']
+
+    # Set head/tail on loop pipe elements, combining from/to and flow_dir.
+    # GREATLY simplifies network construction
+    alias_pipe_endpoints(loop)
+
+    resolved_pipes = set()
+
+    loopsize = {}
+    looppipeset = {}
+    unresolved_loops = set()
+    for iloop, currloop in enumerate(loop):
+        unresolved_loops.add(iloop)
+        looppipeset[iloop] = set()
+        loopsize[iloop] = len(currloop)
+        for currpipe in currloop:
+            looppipeset[iloop].add(currpipe['pipe_id'])
+
+    # Order loop id by length
+    # there must be a better way of doing this but Python sort is baffling
+    resolve_order = list(OrderedDict(sorted(loopsize.items(),
+                                            key=lambda t: t[1])).keys())
+
+    # Initialize first free junction ID
+    ijn = 0
+    iterct = 0
+
+    while unresolved_loops:
+        iterct += 1
+        iloop = resolve_order.pop()
+        currloop = loop[iloop]
+
+        _logger.debug('Iteration {:d}, loop ID: {:d}, first free '
+                      'junction index: {:d}'.format(iterct, iloop, ijn))
+#         print('\nCurrent loop: ',)
+#         _pp.pprint(currloop)
+        for ilooppipe, looppipe in enumerate(currloop):
+            # Set previous pipe
+            # Note that due to array indexing, ilooppipe-1 is -1
+            # for the first pipe in the pipe loop which
+            # points to the last pipe in the pipe loop
+            # allowing easy reference to the first pipe's
+            # predecessor
+            prev_pipe_id = currloop[ilooppipe-1]['pipe_id']
+            prev_tail_key = currloop[ilooppipe-1]['tail']
+            prevpipe = pipe[prev_pipe_id]
+
+            # Set current pipe
+            curr_pipe_id = looppipe['pipe_id']
+            curr_head_key = looppipe['head']
+            currpipe = pipe[curr_pipe_id]
+
+            _logger.debug('Loop element {:d}:'.format(ilooppipe))
+#             print('  Previous pipe: {:d}:'.format(prev_pipe_id))
+#             _pp.pprint(prevpipe)
+#             print('  Current pipe: {:d}:'.format(curr_pipe_id))
+#             _pp.pprint(currpipe)
+
+            # Case 1: Current pipe head junction has been assigned
+            #         Set previous pipe tail junction to same junction ID
+            #         if not already defined
+            #         Advance to next case
+            if curr_head_key in currpipe:
+                _logger.debug('> Current pipe {:d} is already known'
+                              .format(curr_pipe_id))
+                if prev_tail_key not in prevpipe:
+                    prevpipe[prev_tail_key] = currpipe[curr_head_key]
+                    _logger.debug('* Previous pipe {:d} tail is unknown; '
+                                  'setting tail ({:s}) to {:d}'
+                                  .format(prev_pipe_id, prev_tail_key,
+                                          currpipe[curr_head_key]))
+#                 if prev_tail_key not in prevpipe:
+#                     prevpipe[prev_tail_key] = ijnfirst
+#                     _logger.debug('* Previous pipe {:d} tail is unknown; '
+#                                   'setting tail ({:s}) to {:d}'
+#                                   .format(prev_pipe_id, prev_tail_key,
+#                                           ijnfirst))
+            else:
+
+                # Derive current pipe head junction ID (ijnfirst)
+                # Set to previous pipe tail junction ID if defined
+                # Otherwise use first free junction ID
+                if prev_tail_key in prevpipe:
+                    ijnfirst = prevpipe[prev_tail_key]
+                    _logger.debug('  Preceeding pipe {:d} is already known; '
+                                  'ijnfirst set to {:d}'
+                                  .format(prev_pipe_id, ijnfirst))
+                else:
+                    ijnfirst = ijn
+                    _logger.debug('  Neither previous pipe {:d} tail or '
+                                  'current pipe {:d} head is already known; '
+                                  'ijnfirst set to {:d}'
+                                  .format(prev_pipe_id, curr_pipe_id,
+                                          ijnfirst))
+
+                # Case 2: Current pipe head junction has not been assigned
+                #         Assign current pipe head junction ID (ijnhead)
+                #         to current pipe
+                #         Set previous pipe tail junction to same current
+                #         pipe head junction ID if not already defined
+                #         Advance to next case
+                currpipe[curr_head_key] = ijnfirst
+                _logger.debug('* Current pipe {:d} is unknown; setting '
+                              'head ({:s}) to {:d}'
+                              .format(curr_pipe_id, curr_head_key, ijnfirst))
+
+                resolved_pipes.add(curr_pipe_id)
+
+                # Increment free junction ID if current free junction ID
+                # has been assigned
+                if ijnfirst == ijn:
+                    ijn = ijn + 1
+
+                if prev_tail_key not in prevpipe:
+                    prevpipe[prev_tail_key] = ijnfirst
+                    _logger.debug('* Previous pipe {:d} tail is unknown; '
+                                  'setting tail ({:s}) to {:d}'
+                                  .format(prev_pipe_id, prev_tail_key,
+                                          ijnfirst))
+#                 else:
+#                     assert prevpipe[prev_tail_key] == ijnfirst
+
+#         _logger.debug('### Pipe endpoint verification for loop {:d}'
+#                       .format(iloop))
+#         for ilooppipe, looppipe in enumerate(currloop):
+#             pipe_id = looppipe['pipe_id']
+#             _logger.debug('# Pipe {:d}'.format(pipe_id))
+#             currpipe = pipe[pipe_id]
+#             _pp.pprint(currpipe)
+#             # replace with Exceptions
+#             assert 'from' in currpipe
+#             assert 'to' in currpipe
+#             _logger.debug('# Pipe {:d} is ok'.format(pipe_id))
+
+        unresolved_loops.remove(iloop)
+
+        if unresolved_loops:
+            overlap = {}
+            for jloop in unresolved_loops:
+                overlap[jloop] = len(resolved_pipes & looppipeset[jloop])
+
+            _logger.debug('Overlap: {:s}'.format(repr(overlap)))
+            resolve_order = list(OrderedDict(
+                                sorted(overlap.items(),
+                                       key=lambda t: t[1])).keys())
+
+#         print('\n######## State at end of iteration {:d} ########'
+#               .format(iterct))
+#         print('\nPipes:')
+#         _pp.pprint(pipe)
+
+
+def create_topology_dotfile(case_dom, filepath='tmp.gv'):
+    """Create directed graph in GraphViz ``dot`` format
+
+    Args:
+        case_dom (dict): Pipe flow network data model
+        filepath (str): Absolute path of dotfile"""
+
+    jfmt = 'J{:d}'
+    pqfmt = 'P{:d}: {:0.3f~}'
+
+    G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
+
+    junc = set()
+    for ipipe, currpipe in enumerate(case_dom['pipe']):
+        junc.add(currpipe['from'])
+        junc.add(currpipe['to'])
+
+    for ijn in junc:
+        jtag = jfmt.format(ijn)
+        G.add_node(jtag, shape='circle', label=jtag)
+
+    for idx, link in enumerate(case_dom['pipe']):
+        pqtag = pqfmt.format(idx, link['vol_flow'])
+        jfrom = jfmt.format(link['from'])
+        jto = jfmt.format(link['to'])
+        G.add_edge(jfrom, jto, label=pqtag)
+
+    dotfn = abspath(filepath)
+    basepath, ext = splitext(dotfn)
+    pngpath = abspath(basepath + '.png')
+    _logger.debug('Writing png to {:s}'.format(pngpath))
+    G.write(dotfn)
+    G.draw(path=pngpath, prog='dot')
+
+    return
+
+
 def main(args):
     """Main entry point allowing external calls
 
@@ -740,6 +968,13 @@ def main(args):
                       .format(icase))
 
             print(flow_and_head_loss_report(case_dom))
+            if args.topology:
+                dotfn = abspath((splitext(fh.name))[0] + '_{:d}.gv'
+                                                         .format(icase))
+                # Derive network for topology diagram
+                derive_junctions_from_loops(case_dom)
+
+                create_topology_dotfile(case_dom, dotfn)
 
 #            print('case_dom:')
 #            _pp.pprint(case_dom)
