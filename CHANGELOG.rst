@@ -2,6 +2,12 @@
 Changelog
 =========
 
+Version 0.0.4
+=============
+
+Added topology diagram generation to jeppson_ch6b and jeppson_ch7. Added output
+control options to all applications.
+
 Version 0.0.3
 =============
 

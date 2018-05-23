@@ -542,7 +542,35 @@ def alias_pipe_endpoints(loop):
 
 def derive_junctions_from_loops(case_dom):
     """Derive full pipe network topology and explicitly enumerate junctions
-    based on lists of pipes and flow loops
+    based on lists of pipes and flow loops.
+
+    The basic principle of operation is, for each pipe in each loop, to set
+    the 'head' endpoint of the pipe either with the junction ID of the 'tail'
+    endpoint of the previous pipe or with the current free junction ID. 'head'
+    and 'tail' correspond to 'from' and 'to' for pipes with a positive
+    flow_dir, and 'to' and 'from' for pipes with a negative flow_dir. The
+    routine alias_pipe_endpoints() sets 'head' and 'tail' appropriately for
+    each pipe under case_dom['loop']. When a pipe is resolved, the junction ID
+    assigned to its head is also assigned to the previous pipe's tail to ensure
+    consistency between adjacent pipes. At the end of processing a pipe loop,
+    all the pipes in the loop have been added to the resolved_pipes set and the
+    loop ID is removed from the unresolved_loops set.
+
+    The first loop is selected by length to maximize the number of pipes
+    resolved in the first iteration. The next loop selected for resolution is
+    the one which contains the largest number of previously-resolved pipes.
+    This reduces the number of new junction IDs associated during the iteration
+    and maximizes the amount of overlap the loop has with the currently-defined
+    network. Naive selection of loops may cause two loops which overlap at a
+    single point to be resolved in such a way that a shared junction can be
+    independently identified so that it appears to be two separate junctions.
+    By maximizing the overlap of a loop with the existing network, the chance
+    of this occuring is reduced or eliminated.
+
+    Note: This algoritm expects pipes specified in loops to be adjacent with
+    the last pipe in the loop definition being adjacent to the first pipe
+    defined. It is not clear this restriction was present in the original code,
+    however it is common practice.
 
     Args:
         case_dom (dict): Pipe flow network data model
@@ -551,12 +579,18 @@ def derive_junctions_from_loops(case_dom):
     pipe = case_dom['pipe']
     loop = case_dom['loop']
 
-    # Set head/tail on loop pipe elements, combining from/to and flow_dir.
-    # GREATLY simplifies network construction
+# Set head/tail on loop pipe elements, combining from/to and flow_dir.  GREATLY
+# simplifies network construction
     alias_pipe_endpoints(loop)
 
+# resolved_pipes will contain the set of pipes with both endpoints defined
     resolved_pipes = set()
 
+# loopsize allows initial loop resolution order to start with the longest loop
+# looppipeset allows he unresolved loop with the large number of resolved pipes
+# to be selected as the next loop to resolve
+# unresolved loops allows us to track which loops remain to be resolved so we
+# can resolve them in any order
     loopsize = {}
     looppipeset = {}
     unresolved_loops = set()
@@ -567,8 +601,8 @@ def derive_junctions_from_loops(case_dom):
         for currpipe in currloop:
             looppipeset[iloop].add(currpipe['pipe_id'])
 
-    # Order loop id by length
-    # there must be a better way of doing this but Python sort is baffling
+# Order loop id by length
+# TODO: There must be a better way of doing this but Python sort is baffling
     resolve_order = list(OrderedDict(sorted(loopsize.items(),
                                             key=lambda t: t[1])).keys())
 
@@ -620,12 +654,6 @@ def derive_junctions_from_loops(case_dom):
                                   'setting tail ({:s}) to {:d}'
                                   .format(prev_pipe_id, prev_tail_key,
                                           currpipe[curr_head_key]))
-#                 if prev_tail_key not in prevpipe:
-#                     prevpipe[prev_tail_key] = ijnfirst
-#                     _logger.debug('* Previous pipe {:d} tail is unknown; '
-#                                   'setting tail ({:s}) to {:d}'
-#                                   .format(prev_pipe_id, prev_tail_key,
-#                                           ijnfirst))
             else:
 
                 # Derive current pipe head junction ID (ijnfirst)
@@ -668,23 +696,12 @@ def derive_junctions_from_loops(case_dom):
                                   'setting tail ({:s}) to {:d}'
                                   .format(prev_pipe_id, prev_tail_key,
                                           ijnfirst))
-#                 else:
-#                     assert prevpipe[prev_tail_key] == ijnfirst
-
-#         _logger.debug('### Pipe endpoint verification for loop {:d}'
-#                       .format(iloop))
-#         for ilooppipe, looppipe in enumerate(currloop):
-#             pipe_id = looppipe['pipe_id']
-#             _logger.debug('# Pipe {:d}'.format(pipe_id))
-#             currpipe = pipe[pipe_id]
-#             _pp.pprint(currpipe)
-#             # replace with Exceptions
-#             assert 'from' in currpipe
-#             assert 'to' in currpipe
-#             _logger.debug('# Pipe {:d} is ok'.format(pipe_id))
 
         unresolved_loops.remove(iloop)
 
+# Set resolve_order based on overlap between each unresolved loop and the set
+# of resolved pipes; iloop will be taken from the end of the list. If no
+# unresolved loops remain, cycle loop: this is the loop termination condition.
         if unresolved_loops:
             overlap = {}
             for jloop in unresolved_loops:
@@ -694,11 +711,6 @@ def derive_junctions_from_loops(case_dom):
             resolve_order = list(OrderedDict(
                                 sorted(overlap.items(),
                                        key=lambda t: t[1])).keys())
-
-#         print('\n######## State at end of iteration {:d} ########'
-#               .format(iterct))
-#         print('\nPipes:')
-#         _pp.pprint(pipe)
 
 
 def create_topology_dotfile(case_dom, filepath='tmp.gv'):
@@ -713,15 +725,19 @@ def create_topology_dotfile(case_dom, filepath='tmp.gv'):
 
     G = pgv.AGraph(directed=True, splines=False, ratio='fill', overlap=False)
 
+# Derive set of junctions from pipe endpoints.
     junc = set()
     for ipipe, currpipe in enumerate(case_dom['pipe']):
         junc.add(currpipe['from'])
         junc.add(currpipe['to'])
 
+# Create junction nodes
     for ijn in junc:
         jtag = jfmt.format(ijn)
         G.add_node(jtag, shape='circle', label=jtag)
 
+# Create pipe edges. Nevative flow rates indicate flow opposite to the defined
+# convention.
     for idx, link in enumerate(case_dom['pipe']):
         pqtag = pqfmt.format(idx, link['vol_flow'])
         jfrom = jfmt.format(link['from'])
