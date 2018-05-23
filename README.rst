@@ -153,41 +153,28 @@ jeppson_ch6b, and jeppson_ch7). The data models have similar sections and
 overal structure, but they are not interchangeable. Example data models for
 each network flow solver can be found in the ``userdoc`` directory.
 
-In programs jeppson_ch5 and jeppson_ch6a, the pygraphviz library was used to
+In the network flow solver programs, the pygraphviz library was used to
 generate flow topology diagrams for displaying results and validating input. At
 present the diagram layout and quantitative elements need tuning to improve
 presentation, however diagrams are complete and accurate with respect to
 topology, pressure and flow display, inflows, outflows, and flow direction.
 
 Unit testing is applied principally to object-oriented components, mainly
-the Pipe class in jeppson.pipe and the InputLine class in jeppson.input.
-Integral testing was used to manually compare the Python applications with the
-original Fortran applications. Had the applications been designed as objects,
-unit testing would have been a more reasonable choice since it can easily be
-automated. The choice of application architecture makes the individual programs
-rather difficult to test; a more modular or object-oriented design would
-simplify testing but would also complicate implementation. In this case, the
-decision was to go with a simpler application architecture and trade ease of
-implementation for ease of testing. This is reasonable in a prototype or
-demonstrator application such as this; it may not be appropriate for other
-application roles and use cases.
+the classes in jeppson.pipe and jeppson.input.  Integral testing was used to
+manually compare the Python applications with the original Fortran
+applications. Had the applications been designed as objects, unit testing would
+have been a more reasonable choice since it can easily be automated. The choice
+of application architecture makes the individual programs rather difficult to
+test; a more modular or object-oriented design would simplify testing but would
+also complicate implementation. In this case, the decision was to go with a
+simpler application architecture and trade ease of implementation for ease of
+testing. This is reasonable in a prototype or demonstrator application such as
+this; it may not be appropriate for other application roles and use cases.
 
 
 Possible Future Work
 ====================
 
-
-Add GraphViz support for all network solvers
---------------------------------------------
-
-Adding GraphViz support for the ``jeppson_ch5`` and ``jeppson_ch6a``
-applications was straightforward since the data model for these solvers
-included lists of pipes and the junctions which connect them.
-GraphViz support for ``jeppson_ch6b`` and ``jeppson_ch7`` programs is
-complicated since junctions are not explicitly enumerated; instead, a list of
-pipes and flow loops comprised of pipes are provided. Generating and
-enumerating a list of connecting junctions from loop data is a fairly involved
-process.
 
 Data serialization
 ------------------
