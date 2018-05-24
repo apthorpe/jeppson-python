@@ -73,7 +73,7 @@ class SimplePipe(object):
     def _update_ld_ratio(self):
         """Internal method to update pipe aspect ratio (L/D)"""
         if self._idiameter > (0.0 * ureg.meter):
-            self._ld_ratio = self._length / self._idiameter 
+            self._ld_ratio = self._length / self._idiameter
 
     @property
     def idiameter(self):
@@ -184,7 +184,8 @@ class SimpleCHWPipe(SimplePipe):
         Args:
             label (str): text description, Required.
             length (Quantity): length in length units. Required.
-            idiameter (Quantity): pipe inner diameter in length units. Required.
+            idiameter (Quantity): pipe inner diameter in length units.
+              Required.
             chw (float): Hazen-Williams coefficient, dimensionless. Required.
 
         Raises:
@@ -219,6 +220,7 @@ class SimpleCHWPipe(SimplePipe):
 
         self._chw = chw
 
+
 class SimpleEFPipe(SimplePipe):
     """Simple pipe segment class with surface roughness
 
@@ -243,7 +245,8 @@ class SimpleEFPipe(SimplePipe):
         Args:
             label (str): text description, Required.
             length (Quantity): length in length units. Required.
-            idiameter (Quantity): pipe inner diameter in length units. Required.
+            idiameter (Quantity): pipe inner diameter in length units.
+              Required.
             froughness (Quantity): absolute pipe roughness in length units.
                                 Required if eroughness not set.
             eroughness (float): relative pipe roughness, dimensionless.
@@ -272,7 +275,7 @@ class SimpleEFPipe(SimplePipe):
     def set_flow_conditions(self, vol_flow, kin_visc):
         """Specify volumetric flow and fluid properties so flow velocity,
         Reynolds number, and friction factor may be calculated.
-        
+
         Args:
             vol_flow (Quantity): Volumetric flow rate
             kin_visc (Quantity): Kinematic viscosity
@@ -329,12 +332,12 @@ class SimpleEFPipe(SimplePipe):
             raise ValueError('Absolute surface roughness is too small '
                              '(< 0.0m)')
         elif froughness.to('m').magnitude \
-            > 0.1 * self._idiameter.to('m').magnitude:
+                > 0.1 * self._idiameter.to('m').magnitude:
             raise ValueError('Absolute surface roughness is too large '
                              '(> 0.1 idiameter)')
 
         self._froughness = froughness
-        self._eroughness = (self._froughness.to('m') 
+        self._eroughness = (self._froughness.to('m')
                             / self._idiameter.to('m')).magnitude
 
     @property

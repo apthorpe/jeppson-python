@@ -26,7 +26,7 @@ import numpy as np
 import pygraphviz as pgv
 
 from . import _logger, Q_
-from jeppson.input import InputLine
+from jeppson.input import get_data_line
 from jeppson.constants import ahws_us, echw, edhw
 
 from jeppson import __version__
@@ -933,14 +933,7 @@ def main(args):
         _logger.info(msg)
 
         icase = 0
-        deck = []
-
-        for ict, rawline in enumerate(fh):
-            iline = InputLine(line=rawline, ipos=ict+1)
-            _logger.debug(iline.as_log())
-
-            if iline.typecode == 'D':
-                deck.append(iline)
+        deck = [iline for iline in get_data_line(fh)]
 
         iptr = 0
         while iptr < len(deck):

@@ -23,7 +23,7 @@ import scipy.constants as sc
 from fluids.friction import friction_factor
 
 from . import _logger, ureg, Q_
-from jeppson.input import InputLine
+from jeppson.input import get_data_line
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
@@ -551,55 +551,47 @@ def main(args):
         msg = 'Processing file: {0:s}'.format(fh.name)
         _logger.info(msg)
 
-        for ict, rawline in enumerate(fh):
-            iline = InputLine(line=rawline, ipos=ict+1)
-            _logger.debug(iline.as_log())
+        for iline in get_data_line(fh):
 
-            if iline.typecode == 'D':
-                _logger.info('Processing data line:')
-                _logger.info(iline.as_log())
+            indat = extract_case_input(iline)
+            idata = indat['input']
+            results = generate_results(idata)
 
-                indat = extract_case_input(iline)
-                idata = indat['input']
-                results = generate_results(idata)
-#                results = generate_results(indat['input'], indat['uinput'])
+            # Log calcularion status;
+            if results['status'] == 'ok':
+                _logger.debug('Case processed successfully')
+            elif results['status'] == 'warning':
+                _logger.warning('Case processed with warning: {0:s}'
+                                .format(results['msg']))
+            elif results['status'] == 'error':
+                _logger.error('Case not processed due to input error: {0:s}'
+                              .format(results['msg']))
+            else:
+                _logger.error('Unknown status processing case: "{0:s}", {1:s}'
+                              .format(results['status'], results['msg']))
 
-                # Log calcularion status;
-                if results['status'] == 'ok':
-                    _logger.debug('Case processed successfully')
-                elif results['status'] == 'warning':
-                    _logger.warning('Case processed with warning: {0:s}'
-                                    .format(results['msg']))
-                elif results['status'] == 'error':
-                    _logger.error('Case not processed due to input '
-                                  'error: {0:s}'.format(results['msg']))
-                else:
-                    _logger.error('Unknown status processing case: '
-                                  '"{0:s}", {1:s}'
-                                  .format(results['status'], results['msg']))
+            # Finally, print results as original code; infer output units
+            # from input units
+            if results['status'] in ('ok', 'warning'):
+                if args.legacy:
+                    ostr = generate_legacy_output(idata,
+                                                  results['output'],
+                                                  indat['units'])
+                    print(ostr)
 
-                # Finally, print results as original code; infer output units
-                # from input units
-                if results['status'] in ('ok', 'warning'):
-                    if args.legacy:
-                        ostr = generate_legacy_output(idata,
-                                                      results['output'],
-                                                      indat['units'])
-                        print(ostr)
-
-                    if args.modern:
-                        ostr = generate_modern_output(idata,
-                                                      results['derived'],
-                                                      results['output'],
-                                                      indat['units'])
-                        print(ostr)
-                else:
-                    # Differs from original code; broken input would crash and
-                    # all input was provided via STDIN. Here multiple files may
-                    # be procssed, each potentially containing multiple cases.
-                    # Report errors with line and source file name
-                    print('! Case defined on line {0:d} of {1:s} failed'
-                          .format(ict, fh.name))
+                if args.modern:
+                    ostr = generate_modern_output(idata,
+                                                  results['derived'],
+                                                  results['output'],
+                                                  indat['units'])
+                    print(ostr)
+            else:
+                # Differs from original code; broken input would crash and
+                # all input was provided via STDIN. Here multiple files may
+                # be procssed, each potentially containing multiple cases.
+                # Report errors with line and source file name
+                print('! Case defined on line {0:d} of {1:s} failed'
+                      .format(iline.ipos, fh.name))
 
     _logger.info("Ending jeppson_ch2")
 

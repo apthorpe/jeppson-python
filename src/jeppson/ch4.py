@@ -23,7 +23,7 @@ import scipy.constants as sc
 from fluids.friction import friction_factor
 
 from . import _logger, ureg, Q_
-from jeppson.input import InputLine
+from jeppson.input import get_data_line
 from jeppson import __version__
 
 __author__ = "Bob Apthorpe"
@@ -355,6 +355,7 @@ def main(args):
     Args:
         args ([str]): command line parameter list
     """
+
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.info("Starting jeppson_ch4")
@@ -363,41 +364,35 @@ def main(args):
         msg = 'Processing file: {0:s}'.format(fh.name)
         _logger.info(msg)
 
-        for ict, rawline in enumerate(fh):
-            iline = InputLine(line=rawline, ipos=ict+1)
-            _logger.debug(iline.as_log())
+        for iline in get_data_line(fh):
 
-            if iline.typecode == 'D':
-                _logger.info('Processing data line:')
-                _logger.info(iline.as_log())
+            results = extract_case_input(iline)
 
-                results = extract_case_input(iline)
+            # Log parse status;
+            if results['status'] == 'ok':
+                _logger.debug('Case processed successfully')
+            elif results['status'] == 'warning':
+                _logger.warning('Case processed with warning: {0:s}'
+                                .format(results['msg']))
+            elif results['status'] == 'error':
+                _logger.error('Case not processed due to input '
+                              'error: {0:s}'.format(results['msg']))
+                _logger.debug('Skipping to next case')
+                continue
+            else:
+                _logger.error('Unknown status processing case: '
+                              '"{0:s}", {1:s}'
+                              .format(results['status'], results['msg']))
+                _logger.debug('Skipping to next case')
+                continue
 
-                # Log parse status;
-                if results['status'] == 'ok':
-                    _logger.debug('Case processed successfully')
-                elif results['status'] == 'warning':
-                    _logger.warning('Case processed with warning: {0:s}'
-                                    .format(results['msg']))
-                elif results['status'] == 'error':
-                    _logger.error('Case not processed due to input '
-                                  'error: {0:s}'.format(results['msg']))
-                    _logger.debug('Skipping to next case')
-                    continue
-                else:
-                    _logger.error('Unknown status processing case: '
-                                  '"{0:s}", {1:s}'
-                                  .format(results['status'], results['msg']))
-                    _logger.debug('Skipping to next case')
-                    continue
+            idata = results['idata']
 
-                idata = results['idata']
+            ddata, odata = generate_results(idata)
 
-                ddata, odata = generate_results(idata)
+            ostr = generate_legacy_output(idata, odata)
 
-                ostr = generate_legacy_output(idata, odata)
-
-                print(ostr)
+            print(ostr)
 
     _logger.info("Ending jeppson_ch4")
 

@@ -11,8 +11,8 @@ except ImportError:
         def emit(self, record):
             pass
 
-LOG = logging.getLogger(__name__)
-LOG.addHandler(NullHandler())
+_logger = logging.getLogger(__name__)
+_logger.addHandler(NullHandler())
 
 
 class InputLine(dict):
@@ -128,3 +128,24 @@ class InputLine(dict):
                 (str): Formatted line with metadata
         """
         return logfmt.format(self.ipos, self.typecode, self._line)
+
+
+def get_data_line(fh):
+    """ Generator returning a non-blank, non-comment InputLine from a file
+    handle
+
+    Args:
+        fh (filehandle): Open readable filehandle
+
+    Return:
+        (InputLine): Data line from input file
+    """
+    for ict, rawline in enumerate(fh):
+        iline = InputLine(line=rawline, ipos=ict+1)
+        _logger.debug(iline.as_log())
+
+        if iline.typecode == 'D':
+            _logger.debug('Yielding line {:d}'.format(iline.ipos))
+            yield iline
+
+    _logger.debug('All lines consumed in {:s}.'.format(fh.name))
